@@ -1,0 +1,47 @@
+version: "0.2"
+language: en
+ignorePaths:
+  - go.mod
+  - go.sum
+  - .gitignore
+  - cspell.config.yaml
+words:
+  - agiledragon
+  - ALLCAPS
+  - alllower
+  - apiurl
+  - boumenot
+  - CLUSTERDOWN
+  - coverprofile
+  - creasty
+  - Debugf
+  - getsentry
+  - gobeam
+  - gocover
+  - gomock
+  - gomonkey
+  - gotest
+  - gotestfmt
+  - gotesttools
+  - Infof
+  - irongut
+  - isgomock
+  - keyvals
+  - marocchino
+  - mitchellh
+  - mockgen
+  - myhost
+  - mytarget
+  - newhost
+  - pflag
+  - pflags
+  - ringbuffer
+  - smallnest
+  - stretchr
+  - Syncer
+  - testhost
+  - TRYAGAIN
+  - varargs
+  - verylongname
+  - Warnf
+  - Zauberhaus
