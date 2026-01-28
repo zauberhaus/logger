@@ -1,6 +1,7 @@
 package sentry_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -22,7 +23,7 @@ func (tm textMarshalerImpl) MarshalText() ([]byte, error) {
 }
 
 // TestNew tests the New function
-func TestMessage(t *testing.T) {
+func TestMessage_Transport(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -97,7 +98,13 @@ func TestMessage(t *testing.T) {
 					assert.Empty(t, event.Exception)
 				})
 			} else {
-				tp.EXPECT().Flush(gomock.Any()).DoAndReturn(func(timeout time.Duration) bool {
+				/*
+					tp.EXPECT().Flush(gomock.Any()).DoAndReturn(func(timeout time.Duration) bool {
+						return true
+					})
+				*/
+
+				tp.EXPECT().FlushWithContext(gomock.Any()).DoAndReturn(func(ctx context.Context) bool {
 					return true
 				})
 
@@ -147,7 +154,7 @@ func TestMessage_Level(t *testing.T) {
 	} {
 		t.Run(level.String(), func(t *testing.T) {
 			if expected == sentry.LevelFatal {
-				tp.EXPECT().Flush(gomock.Any()).DoAndReturn(func(timeout time.Duration) bool {
+				tp.EXPECT().FlushWithContext(gomock.Any()).DoAndReturn(func(ctx context.Context) bool {
 					return true
 				})
 			}

@@ -215,7 +215,7 @@ func TestMemoryLogger_Read(t *testing.T) {
 					select {
 					case err := <-errChan:
 						if blocking {
-							assert.NoError(t, err)
+							assert.ErrorContains(t, err, "EOF")
 						} else {
 							assert.ErrorContains(t, err, "ringbuffer is empty")
 						}
