@@ -75,7 +75,7 @@ func TestWithSentry_Capture(t *testing.T) {
 	var buf bytes.Buffer
 	l := zap.NewLogger(zap.WithSentry(sh, logger.InfoLevel), zap.WithSink(&buf))
 
-	tp.EXPECT().Flush(gomock.Any())
+	tp.EXPECT().FlushWithContext(gomock.Any())
 
 	tp.EXPECT().SendEvent(gomock.Any()).DoAndReturn(func(event *sentry.Event) {
 		assert.Empty(t, event.Message)
