@@ -3,6 +3,7 @@ package logger_test
 import (
 	"testing"
 
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/zauberhaus/logger/pkg/logger"
 )
@@ -277,4 +278,48 @@ func TestLevel_Names(t *testing.T) {
 	names := l.Names()
 
 	assert.Equal(t, []string{"debug", "info", "warn", "error", "panic", "fatal"}, names)
+}
+
+func TestLevel_PflagValue(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		value   string
+		want    logger.Level
+		wantErr bool
+	}{
+		{name: "debug", value: "debug", want: logger.DebugLevel},
+		{name: "info", value: "info", want: logger.InfoLevel},
+		{name: "warn", value: "warn", want: logger.WarnLevel},
+		{name: "error", value: "error", want: logger.ErrorLevel},
+		{name: "panic", value: "panic", want: logger.PanicLevel},
+		{name: "fatal", value: "fatal", want: logger.FatalLevel},
+		{name: "invalid", value: "invalid", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var level logger.Level
+			fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+			fs.Var(&level, "log-level", "log level")
+
+			err := fs.Parse([]string{"--log-level", tt.value})
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.want, level)
+			}
+		})
+	}
+}
+
+func TestLevel_Type(t *testing.T) {
+	t.Parallel()
+
+	var l logger.Level
+	assert.Equal(t, "level", l.Type())
 }
