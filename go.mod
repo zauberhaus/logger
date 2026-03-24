@@ -7,6 +7,7 @@ require (
 	github.com/getsentry/sentry-go v0.42.0
 	github.com/redis/go-redis/v9 v9.17.3
 	github.com/smallnest/ringbuffer v0.1.0
+	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	github.com/zauberhaus/random v1.1.1
 	go.temporal.io/sdk v1.39.0

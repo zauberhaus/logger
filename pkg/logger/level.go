@@ -6,6 +6,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/spf13/pflag"
 )
 
 type Level int
@@ -18,6 +20,8 @@ const (
 	PanicLevel
 	FatalLevel
 )
+
+var _ pflag.Value = (*Level)(nil)
 
 func (l Level) Parse(txt string) (Level, error) {
 	var level Level
@@ -96,4 +100,19 @@ func (l Level) Names() []string {
 	}
 
 	return names
+}
+
+func (l *Level) Set(txt string) error {
+	lvl, err := l.Parse(txt)
+	if err != nil {
+		return err
+	}
+
+	*l = lvl
+
+	return nil
+}
+
+func (l *Level) Type() string {
+	return "level"
 }
