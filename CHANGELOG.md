@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/zauberhaus/logger/compare/v1.0.0...v1.1.0) (2026-03-24)
+
+
+### Features
+
+* extend log level to  pflag.Value ([2190724](https://github.com/zauberhaus/logger/commit/219072492ab5e26f2f2d90e1883cca4c84bfae21))
+
 ## 1.0.0 (2026-01-28)
 
 
