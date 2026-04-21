@@ -65,7 +65,7 @@ func TestRedisMemoryLogger(t *testing.T) {
 			l := redis.NewLogger(m)
 			assert.NotNil(t, l)
 
-			l.Printf(context.Background(), tc.message)
+			l.Printf(context.Background(), "%s", tc.message)
 
 			txt := m.NextLine()
 			var msg message
@@ -119,7 +119,7 @@ func TestRedisLogger_Printf(t *testing.T) {
 			}
 
 			l := redis.NewLogger(mockLogger)
-			l.Printf(context.Background(), tc.message)
+			l.Printf(context.Background(), "%s", tc.message)
 		})
 	}
 }
