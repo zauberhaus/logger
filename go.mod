@@ -3,29 +3,28 @@ module github.com/zauberhaus/logger
 go 1.26
 
 require (
-	github.com/DataDog/datadog-api-client-go/v2 v2.58.0
+	github.com/DataDog/datadog-api-client-go/v2 v2.59.0
 	github.com/DataDog/zstd v1.5.7
 	github.com/agiledragon/gomonkey/v2 v2.14.0
 	github.com/andybalholm/brotli v1.2.1
 	github.com/coder/websocket v1.8.14
-	github.com/getsentry/sentry-go v0.45.1
+	github.com/getsentry/sentry-go v0.46.2
 	github.com/gorilla/websocket v1.5.3
-	github.com/redis/go-redis/v9 v9.18.0
+	github.com/redis/go-redis/v9 v9.19.0
 	github.com/smallnest/ringbuffer v0.1.1
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	github.com/zauberhaus/random v1.1.1
-	go.temporal.io/sdk v1.42.0
+	go.temporal.io/sdk v1.43.0
 	go.uber.org/mock v0.6.0
-	go.uber.org/zap v1.27.1
-	golang.org/x/net v0.49.0
+	go.uber.org/zap v1.28.0
+	golang.org/x/net v0.53.0
 )
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/creasty/defaults v1.8.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/goccy/go-json v0.10.6 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
