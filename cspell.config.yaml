@@ -14,6 +14,8 @@ words:
   - CLUSTERDOWN
   - coverprofile
   - creasty
+  - ddsource
+  - Ddtags
   - Debugf
   - getsentry
   - gobeam
@@ -31,17 +33,25 @@ words:
   - mitchellh
   - mockgen
   - myhost
+  - mysvc
   - mytarget
   - newhost
+  - newrelic
+  - papertrail
+  - papertrailapp
   - pflag
   - pflags
   - ringbuffer
+  - serialises
   - smallnest
+  - sourcetype
   - stretchr
   - Syncer
+  - testapp
   - testhost
   - TRYAGAIN
   - varargs
   - verylongname
   - Warnf
+  - zaplogger
   - Zauberhaus
