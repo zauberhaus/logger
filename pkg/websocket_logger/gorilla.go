@@ -2,18 +2,13 @@ package websocket_logger
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"time"
 
 	ws "github.com/gorilla/websocket"
 	"github.com/zauberhaus/logger/pkg/logger"
 )
-
-type GorillaConnection interface {
-	WriteMessage(messageType int, data []byte) error
-	ReadMessage() (messageType int, p []byte, err error)
-	Close() error
-}
 
 type gorillaLoggingConn struct {
 	conn   *ws.Conn
@@ -49,7 +44,55 @@ func (c *gorillaLoggingConn) Close() error {
 	return err
 }
 
-// LoggingDialer wraps the gorilla dialer to log the handshake
+func (c *gorillaLoggingConn) Subprotocol() string {
+	return c.conn.Subprotocol()
+}
+
+func (c *gorillaLoggingConn) LocalAddr() net.Addr {
+	return c.conn.LocalAddr()
+}
+
+func (c *gorillaLoggingConn) RemoteAddr() net.Addr {
+	return c.conn.RemoteAddr()
+}
+
+func (c *gorillaLoggingConn) WriteControl(messageType int, data []byte, deadline time.Time) error {
+	c.logger.Debugf("[WS CONTROL] Type: %d | Data: %s (deadline %v)", messageType, string(data), deadline)
+	return c.conn.WriteControl(messageType, data, deadline)
+}
+
+func (c *gorillaLoggingConn) SetWriteDeadline(t time.Time) error {
+	c.logger.Debugf("[WS SET WRITE DEADLINE] %v", t)
+	return c.conn.SetWriteDeadline(t)
+}
+
+func (c *gorillaLoggingConn) SetReadDeadline(t time.Time) error {
+	c.logger.Debugf("[WS SET READ DEADLINE] %v", t)
+	return c.conn.SetReadDeadline(t)
+}
+
+func (c *gorillaLoggingConn) SetReadLimit(limit int64) {
+	c.conn.SetReadLimit(limit)
+}
+
+func (c *gorillaLoggingConn) NetConn() net.Conn {
+	return c.conn.NetConn()
+}
+
+func (c *gorillaLoggingConn) UnderlyingConn() net.Conn {
+	return c.conn.UnderlyingConn()
+}
+
+func (c *gorillaLoggingConn) EnableWriteCompression(enable bool) {
+	c.logger.Debugf("[WS ENABLE WRITE COMPRESSION] %v", enable)
+	c.conn.EnableWriteCompression(enable)
+}
+
+func (c *gorillaLoggingConn) SetCompressionLevel(level int) error {
+	c.logger.Debugf("[WS SET COMPRESSION LEVEL] %d", level)
+	return c.conn.SetCompressionLevel(level)
+}
+
 func DialGorilla(ctx context.Context, dialer *ws.Dialer, urlStr string, requestHeader http.Header, logger logger.Logger) (GorillaConnection, *http.Response, error) {
 	if !logger.IsDebugEnabled() {
 		return dialer.DialContext(ctx, urlStr, requestHeader)
