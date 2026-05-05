@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1](https://github.com/zauberhaus/logger/compare/v1.2.0...v1.2.1) (2026-05-05)
+
+
+### Bug Fixes
+
+* extend websocket interfaces ([ce11817](https://github.com/zauberhaus/logger/commit/ce11817efcb8bdaad415b3a82f33f9ca008f57a7))
+* upgrade github actions ([fccc6e5](https://github.com/zauberhaus/logger/commit/fccc6e52557b5c87c18ceb7361a68a1da31adf23))
+
 ## [1.2.0](https://github.com/zauberhaus/logger/compare/v1.1.0...v1.2.0) (2026-05-05)
 
 
