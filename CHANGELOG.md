@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/zauberhaus/logger/compare/v1.1.0...v1.2.0) (2026-05-05)
+
+
+### Features
+
+* add cloud sinks ([72c9911](https://github.com/zauberhaus/logger/commit/72c99116e9dc6ed0e1086f75dc84f7c7f33ff663))
+* add http and websocket logger ([be26aa4](https://github.com/zauberhaus/logger/commit/be26aa46d956e7f8685b351edabf5f40a1975dcc))
+
 ## [1.1.0](https://github.com/zauberhaus/logger/compare/v1.0.0...v1.1.0) (2026-03-24)
 
 
