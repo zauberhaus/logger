@@ -6,16 +6,8 @@ import (
 	"time"
 
 	ws "github.com/coder/websocket"
-
 	"github.com/zauberhaus/logger/pkg/logger"
-	_ "golang.org/x/net/websocket"
 )
-
-type CoderConnection interface {
-	Write(ctx context.Context, messageType ws.MessageType, data []byte) error
-	Read(ctx context.Context) (ws.MessageType, []byte, error)
-	Close(code ws.StatusCode, reason string) error
-}
 
 type coderLoggingConn struct {
 	conn   *ws.Conn
@@ -52,7 +44,38 @@ func (c *coderLoggingConn) Close(code ws.StatusCode, reason string) error {
 	return err
 }
 
-// LoggingDialer wraps the gorilla dialer to log the handshake
+func (c *coderLoggingConn) CloseNow() error {
+	start := time.Now()
+	err := c.conn.CloseNow()
+	duration := time.Since(start)
+
+	if err != nil {
+		c.logger.Errorf("[WS CLOSE NOW FAILED] Error: %v (%v)", err, duration)
+	} else {
+		c.logger.Debugf("[WS CLOSE NOW SUCCESS] %v", duration)
+	}
+
+	return err
+}
+
+func (c *coderLoggingConn) Subprotocol() string {
+	return c.conn.Subprotocol()
+}
+
+func (c *coderLoggingConn) Ping(ctx context.Context) error {
+	start := time.Now()
+	err := c.conn.Ping(ctx)
+	duration := time.Since(start)
+
+	if err != nil {
+		c.logger.Errorf("[WS PING FAILED] Error: %v (%v)", err, duration)
+	} else {
+		c.logger.Debugf("[WS PING SUCCESS] %v", duration)
+	}
+
+	return err
+}
+
 func DialCoder(ctx context.Context, urlStr string, opts *ws.DialOptions, logger logger.Logger) (CoderConnection, *http.Response, error) {
 	if !logger.IsDebugEnabled() {
 		return ws.Dial(ctx, urlStr, opts)

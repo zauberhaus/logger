@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	ws "github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
@@ -168,4 +169,183 @@ func TestGorillaClose(t *testing.T) {
 
 	txt := string(l.Bytes())
 	assert.Contains(t, txt, "[WS CLOSE SUCCESS]")
+}
+
+func TestGorillaWriteControl(t *testing.T) {
+	server := newGorillaEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+
+	conn, _, err := websocket_logger.DialGorilla(context.Background(), ws.DefaultDialer, wsURL(server), nil, l)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	err = conn.WriteControl(ws.PingMessage, []byte("ping"), time.Now().Add(time.Second))
+	require.NoError(t, err)
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS CONTROL] Type: 9 | Data: ping")
+}
+
+func TestGorillaSetWriteDeadline(t *testing.T) {
+	server := newGorillaEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+
+	conn, _, err := websocket_logger.DialGorilla(context.Background(), ws.DefaultDialer, wsURL(server), nil, l)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	deadline := time.Now().Add(5 * time.Second)
+	err = conn.SetWriteDeadline(deadline)
+	require.NoError(t, err)
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS SET WRITE DEADLINE]")
+}
+
+func TestGorillaSetReadDeadline(t *testing.T) {
+	server := newGorillaEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+
+	conn, _, err := websocket_logger.DialGorilla(context.Background(), ws.DefaultDialer, wsURL(server), nil, l)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	deadline := time.Now().Add(5 * time.Second)
+	err = conn.SetReadDeadline(deadline)
+	require.NoError(t, err)
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS SET READ DEADLINE]")
+}
+
+func TestGorillaEnableWriteCompression(t *testing.T) {
+	server := newGorillaEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+
+	conn, _, err := websocket_logger.DialGorilla(context.Background(), ws.DefaultDialer, wsURL(server), nil, l)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	conn.EnableWriteCompression(true)
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS ENABLE WRITE COMPRESSION] true")
+}
+
+func TestGorillaSetCompressionLevel(t *testing.T) {
+	server := newGorillaEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+
+	conn, _, err := websocket_logger.DialGorilla(context.Background(), ws.DefaultDialer, wsURL(server), nil, l)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	err = conn.SetCompressionLevel(6)
+	require.NoError(t, err)
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS SET COMPRESSION LEVEL] 6")
+}
+
+func TestGorillaSubprotocol(t *testing.T) {
+	server := newGorillaEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+
+	conn, _, err := websocket_logger.DialGorilla(context.Background(), ws.DefaultDialer, wsURL(server), nil, l)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	assert.Equal(t, "", conn.Subprotocol())
+}
+
+func TestGorillaLocalAddr(t *testing.T) {
+	server := newGorillaEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+
+	conn, _, err := websocket_logger.DialGorilla(context.Background(), ws.DefaultDialer, wsURL(server), nil, l)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	assert.NotNil(t, conn.LocalAddr())
+}
+
+func TestGorillaRemoteAddr(t *testing.T) {
+	server := newGorillaEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+
+	conn, _, err := websocket_logger.DialGorilla(context.Background(), ws.DefaultDialer, wsURL(server), nil, l)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	assert.NotNil(t, conn.RemoteAddr())
+}
+
+func TestGorillaSetReadLimit(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		conn.WriteMessage(ws.TextMessage, []byte("exceeds limit"))
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}))
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+
+	conn, _, err := websocket_logger.DialGorilla(context.Background(), ws.DefaultDialer, wsURL(server), nil, l)
+	require.NoError(t, err)
+
+	conn.SetReadLimit(5)
+
+	_, _, err = conn.ReadMessage()
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ws.ErrReadLimit)
+}
+
+func TestGorillaNetConn(t *testing.T) {
+	server := newGorillaEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+
+	conn, _, err := websocket_logger.DialGorilla(context.Background(), ws.DefaultDialer, wsURL(server), nil, l)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	assert.NotNil(t, conn.NetConn())
+}
+
+func TestGorillaUnderlyingConn(t *testing.T) {
+	server := newGorillaEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+
+	conn, _, err := websocket_logger.DialGorilla(context.Background(), ws.DefaultDialer, wsURL(server), nil, l)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	assert.NotNil(t, conn.UnderlyingConn())
 }

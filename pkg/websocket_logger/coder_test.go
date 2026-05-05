@@ -170,3 +170,49 @@ func TestCoderClose(t *testing.T) {
 	assert.Contains(t, txt, "[WS CLOSE SUCCESS]")
 	assert.Contains(t, txt, "done")
 }
+
+func TestCoderCloseNow(t *testing.T) {
+	server := newCoderEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+	ctx := context.Background()
+
+	conn, _, err := websocket_logger.DialCoder(ctx, wsURL(server), nil, l)
+	require.NoError(t, err)
+
+	err = conn.CloseNow()
+	require.NoError(t, err)
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS CLOSE NOW SUCCESS]")
+}
+
+func TestCoderPing(t *testing.T) {
+	server := newCoderEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	conn, _, err := websocket_logger.DialCoder(ctx, wsURL(server), nil, l)
+	require.NoError(t, err)
+
+	// Ping blocks until a concurrent Read processes the pong frame.
+	go func() {
+		for {
+			if _, _, err := conn.Read(ctx); err != nil {
+				return
+			}
+		}
+	}()
+
+	err = conn.Ping(ctx)
+	require.NoError(t, err)
+
+	conn.Close(ws.StatusNormalClosure, "")
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS PING SUCCESS]")
+}
