@@ -1,3 +1,4 @@
+// cspell:ignore andybalholm
 package http_logger_test
 
 import (

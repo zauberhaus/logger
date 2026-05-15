@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	ws "github.com/gorilla/websocket"
@@ -23,7 +24,7 @@ func (c *gorillaLoggingConn) WriteMessage(messageType int, data []byte) error {
 func (c *gorillaLoggingConn) ReadMessage() (messageType int, p []byte, err error) {
 	messageType, p, err = c.conn.ReadMessage()
 	if err == nil {
-		c.logger.Debugf("[WS RECV] Type: %d | Data: %s", messageType, string(p))
+		c.logger.Debugf("[WS RECV] Type: %d | Data: %s", messageType, strings.Trim(string(p), "\t\r\n"))
 	} else {
 		c.logger.Debugf("[WS RECV ERROR]: %v", err)
 	}
