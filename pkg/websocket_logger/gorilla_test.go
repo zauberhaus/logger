@@ -1,3 +1,4 @@
+// cspell:ignore nosuchserver
 package websocket_logger_test
 
 import (
