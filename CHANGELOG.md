@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/zauberhaus/logger/compare/v1.2.1...v1.3.0) (2026-05-15)
+
+
+### Features
+
+* add grpc logger ([f614d1d](https://github.com/zauberhaus/logger/commit/f614d1de9c0239fbde3506a5891a0d1698acd478))
+
 ## [1.2.1](https://github.com/zauberhaus/logger/compare/v1.2.0...v1.2.1) (2026-05-05)
 
 
