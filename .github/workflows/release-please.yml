@@ -4,11 +4,17 @@ on:
   push:
     branches:
       - main
-    paths:  
+    paths:
       - "**/*.go"
       - "go.mod"
       - "go.sum"
       - "CHANGELOG.md"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 1.2.3)"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -25,6 +31,7 @@ jobs:
         with:
           # token: ${{ secrets.RELEASE_TOKEN }}
           release-type: go
+          release-as: ${{ github.event_name == 'workflow_dispatch' && inputs.version || '' }}
 
       - name: Checkout Code 
         if: steps.release.outputs.prs_created == 'true'
