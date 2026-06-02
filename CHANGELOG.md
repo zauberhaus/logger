@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/zauberhaus/logger/compare/v1.4.0...v1.4.1) (2026-06-02)
+
+
+### Bug Fixes
+
+* update websocket dialer interfaces ([2ccfb2b](https://github.com/zauberhaus/logger/commit/2ccfb2b43735d373e40cc2dc1887539f8944d6cd))
+
 ## [1.4.0](https://github.com/zauberhaus/logger/compare/v1.3.1...v1.4.0) (2026-06-02)
 
 
