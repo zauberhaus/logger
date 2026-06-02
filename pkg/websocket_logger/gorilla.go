@@ -12,7 +12,7 @@ import (
 )
 
 type gorillaLoggingDialer struct {
-	inner  *ws.Dialer
+	inner  GorillaDialer
 	logger logger.Logger
 }
 
@@ -21,7 +21,7 @@ type gorillaLoggingConn struct {
 	logger logger.Logger
 }
 
-func NewGorillaLoggingDialer(dialer *ws.Dialer, logger logger.Logger) GorillaDialer {
+func NewGorillaLoggingDialer(dialer GorillaDialer, logger logger.Logger) GorillaLoggingDialer {
 	return &gorillaLoggingDialer{
 		inner:  dialer,
 		logger: logger,
