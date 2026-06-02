@@ -464,8 +464,8 @@ func TestNewGorillaLoggingDialerSuccess(t *testing.T) {
 
 	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
-	conn, resp, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	conn, resp, err := dialer.Dial(context.Background(), wsURL(server), nil)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	defer conn.Close()
@@ -481,8 +481,8 @@ func TestNewGorillaLoggingDialerDebugDisabled(t *testing.T) {
 
 	l := memory.NewLogger(zap.WithLevel(logger.InfoLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
-	conn, resp, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	conn, resp, err := dialer.Dial(context.Background(), wsURL(server), nil)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	defer conn.Close()
@@ -494,8 +494,8 @@ func TestNewGorillaLoggingDialerDebugDisabled(t *testing.T) {
 func TestNewGorillaLoggingDialerError(t *testing.T) {
 	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, "ws://localhost:19999/nosuchserver", nil, l)
-	_, _, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	_, _, err := dialer.Dial(context.Background(), "ws://localhost:19999/nosuchserver", nil)
 	require.Error(t, err)
 
 	txt := string(l.Bytes())

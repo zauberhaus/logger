@@ -335,7 +335,7 @@ func TestNewCoderLoggingDialerSuccess(t *testing.T) {
 	ctx := context.Background()
 
 	dialer := websocket_logger.NewCoderLoggingDialer(wsURL(server), nil, l)
-	conn, resp, err := dialer.Dial(ctx)
+	conn, resp, err := dialer.Dial(ctx, wsURL(server), nil)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	defer conn.Close(ws.StatusNormalClosure, "")
@@ -353,7 +353,7 @@ func TestNewCoderLoggingDialerDebugDisabled(t *testing.T) {
 	ctx := context.Background()
 
 	dialer := websocket_logger.NewCoderLoggingDialer(wsURL(server), nil, l)
-	conn, resp, err := dialer.Dial(ctx)
+	conn, resp, err := dialer.Dial(ctx, wsURL(server), nil)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	defer conn.Close(ws.StatusNormalClosure, "")
@@ -367,7 +367,7 @@ func TestNewCoderLoggingDialerError(t *testing.T) {
 	ctx := context.Background()
 
 	dialer := websocket_logger.NewCoderLoggingDialer("ws://localhost:19999/nosuchserver", nil, l)
-	_, _, err := dialer.Dial(ctx)
+	_, _, err := dialer.Dial(ctx, "ws://localhost:19999/nosuchserver", nil)
 	require.Error(t, err)
 
 	txt := string(l.Bytes())

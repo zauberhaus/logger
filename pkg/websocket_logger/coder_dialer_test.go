@@ -1,3 +1,4 @@
+// cspell:ignore nosuchserver
 package websocket_logger_test
 
 import (
@@ -23,7 +24,7 @@ func TestCoder_Dialer_Dialer(t *testing.T) {
 	ctx := context.Background()
 
 	dialer := websocket_logger.NewCoderLoggingDialer(wsURL(server), nil, l)
-	conn, resp, err := dialer.Dial(ctx)
+	conn, resp, err := dialer.Dial(ctx, wsURL(server), nil)
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -42,7 +43,7 @@ func TestCoder_Dialer_DialerDebugDisabled(t *testing.T) {
 	ctx := context.Background()
 
 	dialer := websocket_logger.NewCoderLoggingDialer(wsURL(server), nil, l)
-	conn, resp, err := dialer.Dial(ctx)
+	conn, resp, err := dialer.Dial(ctx, wsURL(server), nil)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	defer conn.Close(ws.StatusNormalClosure, "")
@@ -56,7 +57,7 @@ func TestCoder_Dialer_DialerError(t *testing.T) {
 	ctx := context.Background()
 
 	dialer := websocket_logger.NewCoderLoggingDialer("ws://localhost:19999/nosuchserver", nil, l)
-	_, _, err := dialer.Dial(ctx)
+	_, _, err := dialer.Dial(ctx, "ws://localhost:19999/nosuchserver", nil)
 	require.Error(t, err)
 
 	txt := string(l.Bytes())
@@ -72,7 +73,7 @@ func TestCoder_DialerWrite(t *testing.T) {
 	ctx := context.Background()
 
 	dialer := websocket_logger.NewCoderLoggingDialer(wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(ctx)
+	conn, _, err := dialer.Dial(ctx, wsURL(server), nil)
 	require.NoError(t, err)
 	defer conn.Close(ws.StatusNormalClosure, "")
 
@@ -104,7 +105,7 @@ func TestCoder_DialerRead(t *testing.T) {
 	ctx := context.Background()
 
 	dialer := websocket_logger.NewCoderLoggingDialer(wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(ctx)
+	conn, _, err := dialer.Dial(ctx, wsURL(server), nil)
 	require.NoError(t, err)
 	defer conn.Close(ws.StatusNormalClosure, "")
 
@@ -131,7 +132,7 @@ func TestCoder_DialerReadError(t *testing.T) {
 	ctx := context.Background()
 
 	dialer := websocket_logger.NewCoderLoggingDialer(wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(ctx)
+	conn, _, err := dialer.Dial(ctx, wsURL(server), nil)
 	require.NoError(t, err)
 
 	_, _, err = conn.Read(ctx)
@@ -149,7 +150,7 @@ func TestCoder_DialerClose(t *testing.T) {
 	ctx := context.Background()
 
 	dialer := websocket_logger.NewCoderLoggingDialer(wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(ctx)
+	conn, _, err := dialer.Dial(ctx, wsURL(server), nil)
 	require.NoError(t, err)
 
 	err = conn.Close(ws.StatusNormalClosure, "done")
@@ -168,7 +169,7 @@ func TestCoder_DialerCloseNow(t *testing.T) {
 	ctx := context.Background()
 
 	dialer := websocket_logger.NewCoderLoggingDialer(wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(ctx)
+	conn, _, err := dialer.Dial(ctx, wsURL(server), nil)
 	require.NoError(t, err)
 
 	err = conn.CloseNow()
@@ -187,7 +188,7 @@ func TestCoder_DialerPing(t *testing.T) {
 	defer cancel()
 
 	dialer := websocket_logger.NewCoderLoggingDialer(wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(ctx)
+	conn, _, err := dialer.Dial(ctx, wsURL(server), nil)
 	require.NoError(t, err)
 
 	// Ping blocks until a concurrent Read processes the pong frame.
@@ -206,4 +207,37 @@ func TestCoder_DialerPing(t *testing.T) {
 
 	txt := string(l.Bytes())
 	assert.Contains(t, txt, "[WS PING SUCCESS]")
+}
+
+func TestCoder_DialerWithEmptyHeader(t *testing.T) {
+	server := newCoderEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+	ctx := context.Background()
+
+	dialer := websocket_logger.NewCoderLoggingDialer(wsURL(server), nil, l)
+	conn, _, err := dialer.Dial(ctx, wsURL(server), http.Header{})
+	require.NoError(t, err)
+	defer conn.Close(ws.StatusNormalClosure, "")
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS HANDSHAKE SUCCESS]")
+}
+
+func TestCoder_DialerWithHeader(t *testing.T) {
+	server := newCoderEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+	ctx := context.Background()
+
+	opts := &ws.DialOptions{HTTPHeader: http.Header{}}
+	dialer := websocket_logger.NewCoderLoggingDialer(wsURL(server), opts, l)
+	conn, _, err := dialer.Dial(ctx, wsURL(server), http.Header{"X-Custom": {"test-value"}})
+	require.NoError(t, err)
+	defer conn.Close(ws.StatusNormalClosure, "")
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS HANDSHAKE SUCCESS]")
 }

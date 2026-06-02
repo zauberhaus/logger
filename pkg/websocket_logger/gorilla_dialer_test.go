@@ -23,8 +23,8 @@ func TestGorilla_Dialer_Dialer(t *testing.T) {
 
 	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
-	conn, resp, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	conn, resp, err := dialer.Dial(context.Background(), wsURL(server), nil)
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -41,8 +41,8 @@ func TestGorilla_Dialer_DialerDebugDisabled(t *testing.T) {
 
 	l := memory.NewLogger(zap.WithLevel(logger.InfoLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
-	conn, resp, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	conn, resp, err := dialer.Dial(context.Background(), wsURL(server), nil)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	defer conn.Close()
@@ -54,8 +54,8 @@ func TestGorilla_Dialer_DialerDebugDisabled(t *testing.T) {
 func TestGorilla_Dialer_DialerError(t *testing.T) {
 	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, "ws://localhost:19999/nosuchserver", nil, l)
-	_, _, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	_, _, err := dialer.Dial(context.Background(), "ws://localhost:19999/nosuchserver", nil)
 	require.Error(t, err)
 
 	txt := string(l.Bytes())
@@ -69,8 +69,8 @@ func TestGorilla_DialerWriteMessage(t *testing.T) {
 
 	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	conn, _, err := dialer.Dial(context.Background(), wsURL(server), nil)
 	require.NoError(t, err)
 	defer conn.Close()
 
@@ -99,8 +99,8 @@ func TestGorilla_DialerReadMessage(t *testing.T) {
 
 	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	conn, _, err := dialer.Dial(context.Background(), wsURL(server), nil)
 	require.NoError(t, err)
 	defer conn.Close()
 
@@ -125,8 +125,8 @@ func TestGorilla_DialerReadMessageError(t *testing.T) {
 
 	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	conn, _, err := dialer.Dial(context.Background(), wsURL(server), nil)
 	require.NoError(t, err)
 
 	_, _, err = conn.ReadMessage()
@@ -142,8 +142,8 @@ func TestGorilla_DialerClose(t *testing.T) {
 
 	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	conn, _, err := dialer.Dial(context.Background(), wsURL(server), nil)
 	require.NoError(t, err)
 
 	err = conn.Close()
@@ -159,8 +159,8 @@ func TestGorilla_DialerWriteControl(t *testing.T) {
 
 	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	conn, _, err := dialer.Dial(context.Background(), wsURL(server), nil)
 	require.NoError(t, err)
 	defer conn.Close()
 
@@ -177,8 +177,8 @@ func TestGorilla_DialerSetWriteDeadline(t *testing.T) {
 
 	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	conn, _, err := dialer.Dial(context.Background(), wsURL(server), nil)
 	require.NoError(t, err)
 	defer conn.Close()
 
@@ -196,8 +196,8 @@ func TestGorilla_DialerSetReadDeadline(t *testing.T) {
 
 	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	conn, _, err := dialer.Dial(context.Background(), wsURL(server), nil)
 	require.NoError(t, err)
 	defer conn.Close()
 
@@ -215,8 +215,8 @@ func TestGorilla_DialerEnableWriteCompression(t *testing.T) {
 
 	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	conn, _, err := dialer.Dial(context.Background(), wsURL(server), nil)
 	require.NoError(t, err)
 	defer conn.Close()
 
@@ -232,8 +232,8 @@ func TestGorilla_DialerSetCompressionLevel(t *testing.T) {
 
 	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	conn, _, err := dialer.Dial(context.Background(), wsURL(server), nil)
 	require.NoError(t, err)
 	defer conn.Close()
 
@@ -250,8 +250,8 @@ func TestGorilla_DialerSubprotocol(t *testing.T) {
 
 	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	conn, _, err := dialer.Dial(context.Background(), wsURL(server), nil)
 	require.NoError(t, err)
 	defer conn.Close()
 
@@ -264,8 +264,8 @@ func TestGorilla_DialerLocalAddr(t *testing.T) {
 
 	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	conn, _, err := dialer.Dial(context.Background(), wsURL(server), nil)
 	require.NoError(t, err)
 	defer conn.Close()
 
@@ -278,8 +278,8 @@ func TestGorilla_DialerRemoteAddr(t *testing.T) {
 
 	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	conn, _, err := dialer.Dial(context.Background(), wsURL(server), nil)
 	require.NoError(t, err)
 	defer conn.Close()
 
@@ -304,8 +304,8 @@ func TestGorilla_DialerSetReadLimit(t *testing.T) {
 
 	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	conn, _, err := dialer.Dial(context.Background(), wsURL(server), nil)
 	require.NoError(t, err)
 
 	conn.SetReadLimit(5)
@@ -321,8 +321,8 @@ func TestGorilla_DialerNetConn(t *testing.T) {
 
 	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	conn, _, err := dialer.Dial(context.Background(), wsURL(server), nil)
 	require.NoError(t, err)
 	defer conn.Close()
 
@@ -335,8 +335,8 @@ func TestGorilla_DialerUnderlyingConn(t *testing.T) {
 
 	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
 
-	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
-	conn, _, err := dialer.Dial(context.Background())
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, l)
+	conn, _, err := dialer.Dial(context.Background(), wsURL(server), nil)
 	require.NoError(t, err)
 	defer conn.Close()
 
