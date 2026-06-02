@@ -10,11 +10,11 @@ import (
 )
 
 type CoderDialer interface {
-	Dial(ctx context.Context) (CoderConnection, *http.Response, error)
+	Dial(ctx context.Context, url string, header http.Header) (CoderConnection, *http.Response, error)
 }
 
 type GorillaDialer interface {
-	Dial(ctx context.Context) (GorillaConnection, *http.Response, error)
+	Dial(ctx context.Context, url string, header http.Header) (GorillaConnection, *http.Response, error)
 }
 
 type CoderConnection interface {

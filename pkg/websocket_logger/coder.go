@@ -10,14 +10,12 @@ import (
 )
 
 type coderLoggingDialer struct {
-	url    string
 	opts   *ws.DialOptions
 	logger logger.Logger
 }
 
 func NewCoderLoggingDialer(url string, opts *ws.DialOptions, logger logger.Logger) CoderDialer {
 	return &coderLoggingDialer{
-		url:    url,
 		opts:   opts,
 		logger: logger,
 	}
@@ -95,15 +93,21 @@ func (c *coderLoggingConn) Ping(ctx context.Context) error {
 	return err
 }
 
-func (c *coderLoggingDialer) Dial(ctx context.Context) (CoderConnection, *http.Response, error) {
+func (c *coderLoggingDialer) Dial(ctx context.Context, url string, header http.Header) (CoderConnection, *http.Response, error) {
 	if !c.logger.IsDebugEnabled() {
-		return ws.Dial(ctx, c.url, c.opts)
+		return ws.Dial(ctx, url, c.opts)
 	}
 
-	c.logger.Debugf("[WS HANDSHAKE] Requesting: %s", c.url)
+	c.logger.Debugf("[WS HANDSHAKE] Requesting: %s", url)
 	start := time.Now()
 
-	conn, resp, err := ws.Dial(ctx, c.url, c.opts)
+	for k, items := range header {
+		for _, v := range items {
+			c.opts.HTTPHeader.Add(k, v)
+		}
+	}
+
+	conn, resp, err := ws.Dial(ctx, url, c.opts)
 
 	duration := time.Since(start)
 

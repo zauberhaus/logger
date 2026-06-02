@@ -13,8 +13,6 @@ import (
 
 type gorillaLoggingDialer struct {
 	inner  *ws.Dialer
-	url    string
-	header http.Header
 	logger logger.Logger
 }
 
@@ -23,11 +21,9 @@ type gorillaLoggingConn struct {
 	logger logger.Logger
 }
 
-func NewGorillaLoggingDialer(dialer *ws.Dialer, url string, header http.Header, logger logger.Logger) GorillaDialer {
+func NewGorillaLoggingDialer(dialer *ws.Dialer, logger logger.Logger) GorillaDialer {
 	return &gorillaLoggingDialer{
 		inner:  dialer,
-		url:    url,
-		header: header,
 		logger: logger,
 	}
 }
@@ -130,15 +126,15 @@ func (c *gorillaLoggingConn) SetCompressionLevel(level int) error {
 	return err
 }
 
-func (c *gorillaLoggingDialer) Dial(ctx context.Context) (GorillaConnection, *http.Response, error) {
+func (c *gorillaLoggingDialer) Dial(ctx context.Context, url string, header http.Header) (GorillaConnection, *http.Response, error) {
 	if !c.logger.IsDebugEnabled() {
-		return c.inner.DialContext(ctx, c.url, c.header)
+		return c.inner.DialContext(ctx, url, header)
 	}
 
-	c.logger.Debugf("[WS HANDSHAKE] Requesting: %s", c.url)
+	c.logger.Debugf("[WS HANDSHAKE] Requesting: %s", url)
 	start := time.Now()
 
-	conn, resp, err := c.inner.DialContext(ctx, c.url, c.header)
+	conn, resp, err := c.inner.DialContext(ctx, url, header)
 
 	duration := time.Since(start)
 
