@@ -7,6 +7,7 @@ import (
 	"time"
 
 	coder "github.com/coder/websocket"
+	gorilla "github.com/gorilla/websocket"
 )
 
 type CoderDialer interface {
@@ -14,6 +15,10 @@ type CoderDialer interface {
 }
 
 type GorillaDialer interface {
+	DialContext(ctx context.Context, url string, header http.Header) (*gorilla.Conn, *http.Response, error)
+}
+
+type GorillaLoggingDialer interface {
 	Dial(ctx context.Context, url string, header http.Header) (GorillaConnection, *http.Response, error)
 }
 
