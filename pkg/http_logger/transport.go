@@ -37,8 +37,9 @@ func NewLoggingTransport(proxied http.RoundTripper, logger logger.Logger) http.R
 func (l *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	if l.logger != nil && l.logger.IsDebugEnabled() {
+		url := req.URL.String()
 
-		l.logger.Debugf("--> %s %s", req.Method, req.URL.String())
+		l.logger.Debugf("--> %s %s", req.Method, url)
 
 		if req.Body != nil {
 			body, err := io.ReadAll(req.Body)
@@ -62,7 +63,7 @@ func (l *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 			return nil, err
 		}
 
-		l.logger.Debugf("<-- %d %s (%s)", resp.StatusCode, req.URL.String(), duration)
+		l.logger.Debugf("<-- %d %s (%s)", resp.StatusCode, url, duration)
 
 		if resp.Body != nil {
 			reader, decoded, err := ProcessEncoding(resp)

@@ -38,7 +38,12 @@ func hecConfig(t *testing.T) (hecURL string, clientOpt splunk.Option) {
 func TestSinkIntegration_SendsEvent(t *testing.T) {
 	hecURL, clientOpt := hecConfig(t)
 
-	w, err := splunk.NewSink(hecURL, os.Getenv("SPLUNK_HEC_TOKEN"),
+	token := os.Getenv("SPLUNK_HEC_TOKEN")
+	if token == "" {
+		t.Skip("missing SPLUNK_HEC_TOKEN env variable")
+	}
+
+	w, err := splunk.NewSink(hecURL, token),
 		clientOpt,
 		splunk.WithSource("integration-test"),
 		splunk.WithSourcetype("_json"),
@@ -57,7 +62,12 @@ func TestSinkIntegration_SendsEvent(t *testing.T) {
 func TestSinkIntegration_PlainText(t *testing.T) {
 	hecURL, clientOpt := hecConfig(t)
 
-	w, err := splunk.NewSink(hecURL, os.Getenv("SPLUNK_HEC_TOKEN"), clientOpt)
+	token := os.Getenv("SPLUNK_HEC_TOKEN")
+	if token == "" {
+		t.Skip("missing SPLUNK_HEC_TOKEN env variable")
+	}
+
+	w, err := splunk.NewSink(hecURL, token, clientOpt)
 	require.NoError(t, err)
 	defer w.Close()
 
@@ -70,8 +80,13 @@ func TestSinkIntegration_PlainText(t *testing.T) {
 func TestSinkIntegration_Batch(t *testing.T) {
 	hecURL, clientOpt := hecConfig(t)
 
+	token := os.Getenv("SPLUNK_HEC_TOKEN")
+	if token == "" {
+		t.Skip("missing SPLUNK_HEC_TOKEN env variable")
+	}
+
 	var gotErr error
-	w, err := splunk.NewSink(hecURL, os.Getenv("SPLUNK_HEC_TOKEN"),
+	w, err := splunk.NewSink(hecURL, token,
 		clientOpt,
 		splunk.WithBatchSize(3),
 		splunk.WithFlushInterval(time.Hour),
