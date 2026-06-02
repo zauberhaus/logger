@@ -11,22 +11,43 @@ import (
 	"github.com/zauberhaus/logger/pkg/logger"
 )
 
-type gorillaLoggingConn struct {
-	conn   *ws.Conn
+type gorillaLoggingDialer struct {
+	inner  *ws.Dialer
+	url    string
+	header http.Header
 	logger logger.Logger
 }
 
+type gorillaLoggingConn struct {
+	conn   GorillaConnection
+	logger logger.Logger
+}
+
+func NewGorillaLoggingDialer(dialer *ws.Dialer, url string, header http.Header, logger logger.Logger) GorillaDialer {
+	return &gorillaLoggingDialer{
+		inner:  dialer,
+		url:    url,
+		header: header,
+		logger: logger,
+	}
+}
+
 func (c *gorillaLoggingConn) WriteMessage(messageType int, data []byte) error {
-	c.logger.Debugf("[WS SEND] Type: %d | Data: %s", messageType, string(data))
-	return c.conn.WriteMessage(messageType, data)
+	err := c.conn.WriteMessage(messageType, data)
+	if err != nil {
+		c.logger.Errorf("[WS SEND FAILED] Type: %d | Error: %v", messageType, err)
+	} else {
+		c.logger.Debugf("[WS SEND] Type: %d | Data: %s", messageType, string(data))
+	}
+	return err
 }
 
 func (c *gorillaLoggingConn) ReadMessage() (messageType int, p []byte, err error) {
 	messageType, p, err = c.conn.ReadMessage()
-	if err == nil {
-		c.logger.Debugf("[WS RECV] Type: %d | Data: %s", messageType, strings.Trim(string(p), "\t\r\n"))
+	if err != nil {
+		c.logger.Errorf("[WS RECV ERROR]: %v", err)
 	} else {
-		c.logger.Debugf("[WS RECV ERROR]: %v", err)
+		c.logger.Debugf("[WS RECV] Type: %d | Data: %s", messageType, strings.Trim(string(p), "\t\r\n"))
 	}
 	return
 }
@@ -63,13 +84,23 @@ func (c *gorillaLoggingConn) WriteControl(messageType int, data []byte, deadline
 }
 
 func (c *gorillaLoggingConn) SetWriteDeadline(t time.Time) error {
-	c.logger.Debugf("[WS SET WRITE DEADLINE] %v", t)
-	return c.conn.SetWriteDeadline(t)
+	err := c.conn.SetWriteDeadline(t)
+	if err != nil {
+		c.logger.Errorf("[WS SET WRITE DEADLINE FAILED] %v | Error: %v", t, err)
+	} else {
+		c.logger.Debugf("[WS SET WRITE DEADLINE] %v", t)
+	}
+	return err
 }
 
 func (c *gorillaLoggingConn) SetReadDeadline(t time.Time) error {
-	c.logger.Debugf("[WS SET READ DEADLINE] %v", t)
-	return c.conn.SetReadDeadline(t)
+	err := c.conn.SetReadDeadline(t)
+	if err != nil {
+		c.logger.Errorf("[WS SET READ DEADLINE FAILED] %v | Error: %v", t, err)
+	} else {
+		c.logger.Debugf("[WS SET READ DEADLINE] %v", t)
+	}
+	return err
 }
 
 func (c *gorillaLoggingConn) SetReadLimit(limit int64) {
@@ -85,13 +116,47 @@ func (c *gorillaLoggingConn) UnderlyingConn() net.Conn {
 }
 
 func (c *gorillaLoggingConn) EnableWriteCompression(enable bool) {
-	c.logger.Debugf("[WS ENABLE WRITE COMPRESSION] %v", enable)
 	c.conn.EnableWriteCompression(enable)
+	c.logger.Debugf("[WS ENABLE WRITE COMPRESSION] %v", enable)
 }
 
 func (c *gorillaLoggingConn) SetCompressionLevel(level int) error {
-	c.logger.Debugf("[WS SET COMPRESSION LEVEL] %d", level)
-	return c.conn.SetCompressionLevel(level)
+	err := c.conn.SetCompressionLevel(level)
+	if err != nil {
+		c.logger.Errorf("[WS SET COMPRESSION LEVEL FAILED] %d | Error: %v", level, err)
+	} else {
+		c.logger.Debugf("[WS SET COMPRESSION LEVEL] %d", level)
+	}
+	return err
+}
+
+func (c *gorillaLoggingDialer) Dial(ctx context.Context) (GorillaConnection, *http.Response, error) {
+	if !c.logger.IsDebugEnabled() {
+		return c.inner.DialContext(ctx, c.url, c.header)
+	}
+
+	c.logger.Debugf("[WS HANDSHAKE] Requesting: %s", c.url)
+	start := time.Now()
+
+	conn, resp, err := c.inner.DialContext(ctx, c.url, c.header)
+
+	duration := time.Since(start)
+
+	if err != nil {
+		c.logger.Errorf("[WS HANDSHAKE FAILED] Error: %v | Duration: %v", err, duration)
+		return nil, resp, err
+	}
+
+	status := ""
+	if resp != nil {
+		status = resp.Status
+	}
+	c.logger.Debugf("[WS HANDSHAKE SUCCESS] Status: %s | Duration: %v", status, duration)
+
+	return &gorillaLoggingConn{
+		conn:   conn,
+		logger: c.logger,
+	}, resp, nil
 }
 
 func DialGorilla(ctx context.Context, dialer *ws.Dialer, urlStr string, requestHeader http.Header, logger logger.Logger) (GorillaConnection, *http.Response, error) {
@@ -111,7 +176,11 @@ func DialGorilla(ctx context.Context, dialer *ws.Dialer, urlStr string, requestH
 		return nil, resp, err
 	}
 
-	logger.Debugf("[WS HANDSHAKE SUCCESS] Status: %s | Duration: %v", resp.Status, duration)
+	status := ""
+	if resp != nil {
+		status = resp.Status
+	}
+	logger.Debugf("[WS HANDSHAKE SUCCESS] Status: %s | Duration: %v", status, duration)
 
 	return &gorillaLoggingConn{
 		conn:   conn,

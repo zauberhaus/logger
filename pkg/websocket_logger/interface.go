@@ -3,15 +3,24 @@ package websocket_logger
 import (
 	"context"
 	"net"
+	"net/http"
 	"time"
 
-	ws "github.com/coder/websocket"
+	coder "github.com/coder/websocket"
 )
 
+type CoderDialer interface {
+	Dial(ctx context.Context) (CoderConnection, *http.Response, error)
+}
+
+type GorillaDialer interface {
+	Dial(ctx context.Context) (GorillaConnection, *http.Response, error)
+}
+
 type CoderConnection interface {
-	Write(ctx context.Context, messageType ws.MessageType, data []byte) error
-	Read(ctx context.Context) (ws.MessageType, []byte, error)
-	Close(code ws.StatusCode, reason string) error
+	Write(ctx context.Context, messageType coder.MessageType, data []byte) error
+	Read(ctx context.Context) (coder.MessageType, []byte, error)
+	Close(code coder.StatusCode, reason string) error
 	CloseNow() error
 	Subprotocol() string
 	Ping(ctx context.Context) error
