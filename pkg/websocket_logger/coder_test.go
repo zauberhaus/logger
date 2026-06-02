@@ -1,3 +1,4 @@
+// cspell:ignore nosuchserver
 package websocket_logger_test
 
 import (
@@ -215,4 +216,161 @@ func TestCoderPing(t *testing.T) {
 
 	txt := string(l.Bytes())
 	assert.Contains(t, txt, "[WS PING SUCCESS]")
+}
+
+func TestCoderSubprotocol(t *testing.T) {
+	server := newCoderEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+	ctx := context.Background()
+
+	conn, _, err := websocket_logger.DialCoder(ctx, wsURL(server), nil, l)
+	require.NoError(t, err)
+	defer conn.Close(ws.StatusNormalClosure, "")
+
+	assert.Equal(t, "", conn.Subprotocol())
+}
+
+func TestCoderReadErrorLevel(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := ws.Accept(w, r, &ws.AcceptOptions{InsecureSkipVerify: true})
+		if err != nil {
+			return
+		}
+		conn.Close(ws.StatusGoingAway, "bye")
+	}))
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+	ctx := context.Background()
+
+	conn, _, err := websocket_logger.DialCoder(ctx, wsURL(server), nil, l)
+	require.NoError(t, err)
+
+	_, _, err = conn.Read(ctx)
+	require.Error(t, err)
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS RECV ERROR]")
+}
+
+func TestCoderWriteError(t *testing.T) {
+	server := newCoderEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+	ctx := context.Background()
+
+	conn, _, err := websocket_logger.DialCoder(ctx, wsURL(server), nil, l)
+	require.NoError(t, err)
+	conn.CloseNow()
+
+	err = conn.Write(ctx, ws.MessageText, []byte("after close"))
+	require.Error(t, err)
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS SEND FAILED]")
+}
+
+func TestCoderCloseError(t *testing.T) {
+	server := newCoderEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+	ctx := context.Background()
+
+	conn, _, err := websocket_logger.DialCoder(ctx, wsURL(server), nil, l)
+	require.NoError(t, err)
+	conn.CloseNow()
+
+	err = conn.Close(ws.StatusNormalClosure, "done")
+	require.Error(t, err)
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS CLOSE FAILED]")
+}
+
+func TestCoderCloseNowError(t *testing.T) {
+	server := newCoderEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+	ctx := context.Background()
+
+	conn, _, err := websocket_logger.DialCoder(ctx, wsURL(server), nil, l)
+	require.NoError(t, err)
+	conn.CloseNow()
+
+	err = conn.CloseNow()
+	require.Error(t, err)
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS CLOSE NOW FAILED]")
+}
+
+func TestCoderPingError(t *testing.T) {
+	server := newCoderEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+	ctx := context.Background()
+
+	conn, _, err := websocket_logger.DialCoder(ctx, wsURL(server), nil, l)
+	require.NoError(t, err)
+	conn.CloseNow()
+
+	err = conn.Ping(ctx)
+	require.Error(t, err)
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS PING FAILED]")
+}
+
+func TestNewCoderLoggingDialerSuccess(t *testing.T) {
+	server := newCoderEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+	ctx := context.Background()
+
+	dialer := websocket_logger.NewCoderLoggingDialer(wsURL(server), nil, l)
+	conn, resp, err := dialer.Dial(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	defer conn.Close(ws.StatusNormalClosure, "")
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS HANDSHAKE] Requesting: ws://127.0.0.1:")
+	assert.Contains(t, txt, "[WS HANDSHAKE SUCCESS]")
+}
+
+func TestNewCoderLoggingDialerDebugDisabled(t *testing.T) {
+	server := newCoderEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.InfoLevel))
+	ctx := context.Background()
+
+	dialer := websocket_logger.NewCoderLoggingDialer(wsURL(server), nil, l)
+	conn, resp, err := dialer.Dial(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	defer conn.Close(ws.StatusNormalClosure, "")
+
+	txt := string(l.Bytes())
+	assert.NotContains(t, txt, "[WS HANDSHAKE]")
+}
+
+func TestNewCoderLoggingDialerError(t *testing.T) {
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+	ctx := context.Background()
+
+	dialer := websocket_logger.NewCoderLoggingDialer("ws://localhost:19999/nosuchserver", nil, l)
+	_, _, err := dialer.Dial(ctx)
+	require.Error(t, err)
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS HANDSHAKE] Requesting: ws://localhost:19999/nosuchserver")
+	assert.Contains(t, txt, "[WS HANDSHAKE FAILED]")
 }

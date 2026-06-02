@@ -350,3 +350,155 @@ func TestGorillaUnderlyingConn(t *testing.T) {
 
 	assert.NotNil(t, conn.UnderlyingConn())
 }
+
+func TestGorillaReadMessageErrorLevel(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		conn.Close()
+	}))
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+
+	conn, _, err := websocket_logger.DialGorilla(context.Background(), ws.DefaultDialer, wsURL(server), nil, l)
+	require.NoError(t, err)
+
+	_, _, err = conn.ReadMessage()
+	require.Error(t, err)
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS RECV ERROR]")
+}
+
+func TestGorillaWriteMessageError(t *testing.T) {
+	server := newGorillaEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+
+	conn, _, err := websocket_logger.DialGorilla(context.Background(), ws.DefaultDialer, wsURL(server), nil, l)
+	require.NoError(t, err)
+	conn.Close()
+
+	err = conn.WriteMessage(ws.TextMessage, []byte("after close"))
+	require.Error(t, err)
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS SEND FAILED]")
+}
+
+func TestGorillaCloseError(t *testing.T) {
+	server := newGorillaEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+
+	conn, _, err := websocket_logger.DialGorilla(context.Background(), ws.DefaultDialer, wsURL(server), nil, l)
+	require.NoError(t, err)
+	conn.Close()
+
+	err = conn.Close()
+	require.Error(t, err)
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS CLOSE FAILED]")
+}
+
+func TestGorillaWriteControlError(t *testing.T) {
+	server := newGorillaEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+
+	conn, _, err := websocket_logger.DialGorilla(context.Background(), ws.DefaultDialer, wsURL(server), nil, l)
+	require.NoError(t, err)
+	conn.Close()
+
+	err = conn.WriteControl(ws.PingMessage, []byte("ping"), time.Now().Add(time.Second))
+	require.Error(t, err)
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS CONTROL]")
+}
+
+func TestGorillaSetReadDeadlineError(t *testing.T) {
+	server := newGorillaEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+
+	conn, _, err := websocket_logger.DialGorilla(context.Background(), ws.DefaultDialer, wsURL(server), nil, l)
+	require.NoError(t, err)
+	conn.NetConn().Close()
+
+	err = conn.SetReadDeadline(time.Now().Add(time.Second))
+	require.Error(t, err)
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS SET READ DEADLINE FAILED]")
+}
+
+func TestGorillaSetCompressionLevelError(t *testing.T) {
+	server := newGorillaEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+
+	conn, _, err := websocket_logger.DialGorilla(context.Background(), ws.DefaultDialer, wsURL(server), nil, l)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	err = conn.SetCompressionLevel(99)
+	require.Error(t, err)
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS SET COMPRESSION LEVEL FAILED]")
+}
+
+func TestNewGorillaLoggingDialerSuccess(t *testing.T) {
+	server := newGorillaEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
+	conn, resp, err := dialer.Dial(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	defer conn.Close()
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS HANDSHAKE] Requesting: ws://127.0.0.1:")
+	assert.Contains(t, txt, "[WS HANDSHAKE SUCCESS]")
+}
+
+func TestNewGorillaLoggingDialerDebugDisabled(t *testing.T) {
+	server := newGorillaEchoServer(t)
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.InfoLevel))
+
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, wsURL(server), nil, l)
+	conn, resp, err := dialer.Dial(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	defer conn.Close()
+
+	txt := string(l.Bytes())
+	assert.NotContains(t, txt, "[WS HANDSHAKE]")
+}
+
+func TestNewGorillaLoggingDialerError(t *testing.T) {
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+
+	dialer := websocket_logger.NewGorillaLoggingDialer(ws.DefaultDialer, "ws://localhost:19999/nosuchserver", nil, l)
+	_, _, err := dialer.Dial(context.Background())
+	require.Error(t, err)
+
+	txt := string(l.Bytes())
+	assert.Contains(t, txt, "[WS HANDSHAKE] Requesting: ws://localhost:19999/nosuchserver")
+	assert.Contains(t, txt, "[WS HANDSHAKE FAILED]")
+}
