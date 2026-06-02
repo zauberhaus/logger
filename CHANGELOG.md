@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.2](https://github.com/zauberhaus/logger/compare/v1.4.1...v1.4.2) (2026-06-02)
+
+
+### Bug Fixes
+
+* missing interface changes ([d5563eb](https://github.com/zauberhaus/logger/commit/d5563ebf5c3abe0f6d67083f4b5a737e11c7325a))
+* use interface instead of gorilla dialer ([f4e877a](https://github.com/zauberhaus/logger/commit/f4e877ab13a7d4b8b22b80fdceaacd908f4a3e48))
+
 ## [1.4.1](https://github.com/zauberhaus/logger/compare/v1.4.0...v1.4.1) (2026-06-02)
 
 
