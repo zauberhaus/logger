@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0](https://github.com/zauberhaus/logger/compare/v1.3.1...v1.4.0) (2026-06-02)
+
+
+### Features
+
+* manual release trigger ([593e4b2](https://github.com/zauberhaus/logger/commit/593e4b2125574b8b8e348280bfe6fd7d580c5699))
+* manual release trigger ([7e540c5](https://github.com/zauberhaus/logger/commit/7e540c50e3e7fa7741a2fa4480baac826864e576))
+
 ## [1.3.1](https://github.com/zauberhaus/logger/compare/v1.3.0...v1.3.1) (2026-06-02)
 
 
