@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/zauberhaus/logger/compare/v1.3.0...v1.3.1) (2026-06-02)
+
+
+### Bug Fixes
+
+* hide secrets in path injected from parent round tripper ([a85c70e](https://github.com/zauberhaus/logger/commit/a85c70e792ad7db79ce720fa0e4f090b781f32f7))
+
 ## [1.3.0](https://github.com/zauberhaus/logger/compare/v1.2.1...v1.3.0) (2026-05-15)
 
 
