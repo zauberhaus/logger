@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.3](https://github.com/zauberhaus/logger/compare/v1.4.2...v1.4.3) (2026-07-29)
+
+
+### Bug Fixes
+
+* add test for new core ([a4729cb](https://github.com/zauberhaus/logger/commit/a4729cbd6ea5aa80498401f34f3547d3d3fd3232))
+* separate level for cloned logger ([cf29de4](https://github.com/zauberhaus/logger/commit/cf29de49c9d70642cf02c2815d1b6d240231683c))
+
 ## [1.4.2](https://github.com/zauberhaus/logger/compare/v1.4.1...v1.4.2) (2026-06-02)
 
 
