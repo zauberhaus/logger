@@ -1,5 +1,66 @@
 # Changelog
 
+## [1.4.3](https://github.com/zauberhaus/logger/compare/v1.4.2...v1.4.3) (2026-07-29)
+
+
+### Bug Fixes
+
+* add test for new core ([a4729cb](https://github.com/zauberhaus/logger/commit/a4729cbd6ea5aa80498401f34f3547d3d3fd3232))
+* separate level for cloned logger ([cf29de4](https://github.com/zauberhaus/logger/commit/cf29de49c9d70642cf02c2815d1b6d240231683c))
+
+## [1.4.2](https://github.com/zauberhaus/logger/compare/v1.4.1...v1.4.2) (2026-06-02)
+
+
+### Bug Fixes
+
+* missing interface changes ([d5563eb](https://github.com/zauberhaus/logger/commit/d5563ebf5c3abe0f6d67083f4b5a737e11c7325a))
+* use interface instead of gorilla dialer ([f4e877a](https://github.com/zauberhaus/logger/commit/f4e877ab13a7d4b8b22b80fdceaacd908f4a3e48))
+
+## [1.4.1](https://github.com/zauberhaus/logger/compare/v1.4.0...v1.4.1) (2026-06-02)
+
+
+### Bug Fixes
+
+* update websocket dialer interfaces ([2ccfb2b](https://github.com/zauberhaus/logger/commit/2ccfb2b43735d373e40cc2dc1887539f8944d6cd))
+
+## [1.4.0](https://github.com/zauberhaus/logger/compare/v1.3.1...v1.4.0) (2026-06-02)
+
+
+### Features
+
+* manual release trigger ([593e4b2](https://github.com/zauberhaus/logger/commit/593e4b2125574b8b8e348280bfe6fd7d580c5699))
+* manual release trigger ([7e540c5](https://github.com/zauberhaus/logger/commit/7e540c50e3e7fa7741a2fa4480baac826864e576))
+
+## [1.3.1](https://github.com/zauberhaus/logger/compare/v1.3.0...v1.3.1) (2026-06-02)
+
+
+### Bug Fixes
+
+* hide secrets in path injected from parent round tripper ([a85c70e](https://github.com/zauberhaus/logger/commit/a85c70e792ad7db79ce720fa0e4f090b781f32f7))
+
+## [1.3.0](https://github.com/zauberhaus/logger/compare/v1.2.1...v1.3.0) (2026-05-15)
+
+
+### Features
+
+* add grpc logger ([f614d1d](https://github.com/zauberhaus/logger/commit/f614d1de9c0239fbde3506a5891a0d1698acd478))
+
+## [1.2.1](https://github.com/zauberhaus/logger/compare/v1.2.0...v1.2.1) (2026-05-05)
+
+
+### Bug Fixes
+
+* extend websocket interfaces ([ce11817](https://github.com/zauberhaus/logger/commit/ce11817efcb8bdaad415b3a82f33f9ca008f57a7))
+* upgrade github actions ([fccc6e5](https://github.com/zauberhaus/logger/commit/fccc6e52557b5c87c18ceb7361a68a1da31adf23))
+
+## [1.2.0](https://github.com/zauberhaus/logger/compare/v1.1.0...v1.2.0) (2026-05-05)
+
+
+### Features
+
+* add cloud sinks ([72c9911](https://github.com/zauberhaus/logger/commit/72c99116e9dc6ed0e1086f75dc84f7c7f33ff663))
+* add http and websocket logger ([be26aa4](https://github.com/zauberhaus/logger/commit/be26aa46d956e7f8685b351edabf5f40a1975dcc))
+
 ## [1.1.0](https://github.com/zauberhaus/logger/compare/v1.0.0...v1.1.0) (2026-03-24)
 
 
