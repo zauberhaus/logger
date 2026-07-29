@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
+	core "github.com/zauberhaus/logger"
 	"github.com/zauberhaus/logger/pkg/logger"
 )
 
@@ -322,4 +323,17 @@ func TestLevel_Type(t *testing.T) {
 
 	var l logger.Level
 	assert.Equal(t, "level", l.Type())
+}
+
+func TestLevel_WithSeparation(t *testing.T) {
+	ctx := t.Context()
+
+	l1 := core.GetLogger(ctx)
+	l1.SetLevel(core.DebugLevel)
+
+	l2 := l1.With()
+	l2.SetLevel(core.InfoLevel)
+
+	assert.Equal(t, core.DebugLevel, l1.Level())
+	assert.Equal(t, core.InfoLevel, l2.Level())
 }
