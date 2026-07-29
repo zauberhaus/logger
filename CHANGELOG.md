@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.4](https://github.com/zauberhaus/logger/compare/v1.4.3...v1.4.4) (2026-07-29)
+
+
+### Bug Fixes
+
+* upgrade dependencies ([0977f29](https://github.com/zauberhaus/logger/commit/0977f29a7b657710cc31acf8207056c8c1d985c8))
+
 ## [1.4.3](https://github.com/zauberhaus/logger/compare/v1.4.2...v1.4.3) (2026-07-29)
 
 
