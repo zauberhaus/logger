@@ -14,6 +14,18 @@ func SetLogger(l Logger) {
 	logger = l
 }
 
+func Get(ctx context.Context) Logger {
+	if ctx != nil {
+		if val := ctx.Value(LoggerKey); val != nil {
+			if l, ok := val.(Logger); ok {
+				return l
+			}
+		}
+	}
+
+	return logger
+}
+
 func GetLogger(ctx context.Context) Logger {
 	if ctx != nil {
 		if val := ctx.Value(LoggerKey); val != nil {

@@ -121,7 +121,7 @@ func NewLogger(options ...Option) logger.Logger {
 		encoder = zapcore.NewConsoleEncoder(encoderCfg)
 	}
 
-	core := zapcore.NewCore(encoder, ws, enabler)
+	core := newLevelCore(zapcore.NewCore(encoder, ws, zapcore.DebugLevel), enabler)
 	logger = zap.New(core, o.options...)
 
 	if len(o.fields) > 0 {
@@ -136,9 +136,19 @@ func NewLogger(options ...Option) logger.Logger {
 }
 
 func (z *ZapLogger) With(args ...any) logger.Logger {
+	newLevel := zap.NewAtomicLevelAt(z.level.Level())
+
+	withFields := z.logger.With(args...).Desugar().WithOptions(zap.WrapCore(func(core zapcore.Core) zapcore.Core {
+		if lc, ok := core.(*levelCore); ok {
+			return newLevelCore(lc.Core, newLevel)
+		}
+
+		return core
+	}))
+
 	return &ZapLogger{
-		z.logger.With(args...),
-		z.level,
+		withFields.Sugar(),
+		newLevel,
 		z.hub,
 	}
 }
