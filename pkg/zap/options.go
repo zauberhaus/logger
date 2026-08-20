@@ -30,7 +30,18 @@ type ZapOptions struct {
 	fields  []Field
 	generic map[string]any
 
-	sampling *SamplingConfig
+	sampling     *SamplingConfig
+	noStacktrace bool
+
+	split *levelSplitConfig
+}
+
+// levelSplitConfig holds the configuration set by WithLevelSplit: entries
+// at or above level go to sink; entries below it go to the regular sinks
+// configured via WithSinks/WithSink/WithWriteSyncer.
+type levelSplitConfig struct {
+	level logger.Level
+	sink  io.Writer
 }
 
 type Option interface {
@@ -85,6 +96,12 @@ func WithWriteSyncer(vals ...zapcore.WriteSyncer) Option {
 	})
 }
 
+func WithErrorSink(val io.Writer) Option {
+	return OptionFunc(func(o *ZapOptions) {
+		o.errorSinks = []io.Writer{val}
+	})
+}
+
 func WithErrorSinks(vals ...io.Writer) Option {
 	return OptionFunc(func(o *ZapOptions) {
 		o.errorSinks = append(o.errorSinks, vals...)
@@ -99,7 +116,21 @@ func WithStdOut() Option {
 
 func WithStdErr() Option {
 	return OptionFunc(func(o *ZapOptions) {
-		o.errorSinks = append(o.errorSinks, os.Stdout)
+		o.errorSinks = append(o.errorSinks, os.Stderr)
+	})
+}
+
+// WithLevelSplit routes log entries at or above splitLevel to sink instead
+// of the regular sinks configured via WithSinks/WithSink/WithWriteSyncer,
+// leaving lower-level entries on those regular sinks. The typical use is
+// sending Error and above to stderr while Info/Warn stay on stdout.
+//
+// This is distinct from WithErrorSinks/WithErrorSink, which only capture
+// diagnostics about zap's own internal I/O failures (via zap.ErrorOutput)
+// and do not otherwise affect where application log entries are written.
+func WithLevelSplit(splitLevel logger.Level, sink io.Writer) Option {
+	return OptionFunc(func(o *ZapOptions) {
+		o.split = &levelSplitConfig{level: splitLevel, sink: sink}
 	})
 }
 
@@ -155,5 +186,11 @@ func GetGenericOption[T any](key string, options ...Option) T {
 func WithSampling(val *SamplingConfig) Option {
 	return OptionFunc(func(o *ZapOptions) {
 		o.sampling = val
+	})
+}
+
+func DisableStacktrace() Option {
+	return OptionFunc(func(o *ZapOptions) {
+		o.noStacktrace = true
 	})
 }

@@ -363,6 +363,27 @@ func TestZapLogger_ErrorSink(t *testing.T) {
 	assert.Contains(t, stderr, "write error")
 }
 
+func TestZapLogger_WithErrorSink(t *testing.T) {
+	var b2 bytes.Buffer
+
+	l := zap.NewLogger(zap.WithLevel(logger.InfoLevel), zap.WithSinks(&writer{}), zap.WithOutput(zap.JSONOutput), zap.WithErrorSink(&b2))
+	l = l.With("key", "value")
+	l.Error(fmt.Errorf("test error"))
+
+	stderr := b2.String()
+	assert.Contains(t, stderr, "write error")
+}
+
+func TestZapLogger_WithErrorSink_ReplacesPrevious(t *testing.T) {
+	var b1, b2 bytes.Buffer
+
+	l := zap.NewLogger(zap.WithLevel(logger.InfoLevel), zap.WithSinks(&writer{}), zap.WithOutput(zap.JSONOutput), zap.WithErrorSink(&b1), zap.WithErrorSink(&b2))
+	l.Error(fmt.Errorf("test error"))
+
+	assert.Empty(t, b1.String())
+	assert.Contains(t, b2.String(), "write error")
+}
+
 func TestZapLogger_ErrorSinks(t *testing.T) {
 	var b1 bytes.Buffer
 	var b2 bytes.Buffer
@@ -375,6 +396,68 @@ func TestZapLogger_ErrorSinks(t *testing.T) {
 	stderr2 := b2.String()
 	assert.Equal(t, stderr1, stderr2)
 	assert.Contains(t, stderr1, "write error")
+}
+
+func TestZapLogger_WithLevelSplit(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	l := zap.NewLogger(
+		zap.WithLevel(logger.InfoLevel),
+		zap.WithSinks(&stdout),
+		zap.WithLevelSplit(logger.ErrorLevel, &stderr),
+		zap.WithoutCaller(),
+	)
+
+	l.Info("info message")
+	l.Warn("warn message")
+	l.Error("error message")
+
+	assert.Contains(t, stdout.String(), "info message")
+	assert.Contains(t, stdout.String(), "warn message")
+	assert.NotContains(t, stdout.String(), "error message")
+
+	assert.Contains(t, stderr.String(), "error message")
+	assert.NotContains(t, stderr.String(), "info message")
+	assert.NotContains(t, stderr.String(), "warn message")
+}
+
+func TestZapLogger_WithLevelSplit_RespectsMinLevel(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	l := zap.NewLogger(
+		zap.WithLevel(logger.InfoLevel),
+		zap.WithSinks(&stdout),
+		zap.WithLevelSplit(logger.ErrorLevel, &stderr),
+		zap.WithoutCaller(),
+	)
+
+	l.Debug("debug message")
+
+	assert.Empty(t, stdout.String())
+	assert.Empty(t, stderr.String())
+}
+
+func TestZapLogger_WithLevelSplit_With(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	l := zap.NewLogger(
+		zap.WithLevel(logger.InfoLevel),
+		zap.WithSinks(&stdout),
+		zap.WithLevelSplit(logger.ErrorLevel, &stderr),
+		zap.WithoutCaller(),
+	)
+	l = l.With("key", "value")
+
+	l.Info("info message")
+	l.Error("error message")
+
+	assert.Contains(t, stdout.String(), "info message")
+	assert.Contains(t, stdout.String(), "key")
+	assert.NotContains(t, stdout.String(), "error message")
+
+	assert.Contains(t, stderr.String(), "error message")
+	assert.Contains(t, stderr.String(), "key")
+	assert.NotContains(t, stderr.String(), "info message")
 }
 
 func TestLogger_EnableDebug(t *testing.T) {
@@ -490,6 +573,37 @@ func TestZapLogger_Sampling(t *testing.T) {
 
 	assert.Equal(t, int64(2), atomic.LoadInt64(&sampled))
 	assert.Equal(t, int64(18), atomic.LoadInt64(&dropped))
+}
+
+func TestZapLogger_DisableStacktrace(t *testing.T) {
+	type message struct {
+		Message    string `json:"msg"`
+		Stacktrace string `json:"stacktrace"`
+	}
+
+	t.Run("enabled by default", func(t *testing.T) {
+		var buf bytes.Buffer
+
+		l := zap.NewLogger(zap.WithSink(&buf), zap.WithOutput(zap.JSONOutput))
+		l.Error("test error")
+
+		var msg message
+		err := json.NewDecoder(&buf).Decode(&msg)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, msg.Stacktrace)
+	})
+
+	t.Run("disabled", func(t *testing.T) {
+		var buf bytes.Buffer
+
+		l := zap.NewLogger(zap.WithSink(&buf), zap.WithOutput(zap.JSONOutput), zap.DisableStacktrace())
+		l.Error("test error")
+
+		var msg message
+		err := json.NewDecoder(&buf).Decode(&msg)
+		assert.NoError(t, err)
+		assert.Empty(t, msg.Stacktrace)
+	})
 }
 
 func TestZapLogger_Fields(t *testing.T) {
