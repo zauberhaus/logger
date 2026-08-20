@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/zauberhaus/logger/compare/v1.4.4...v1.5.0) (2026-08-20)
+
+
+### Features
+
+* add sp[lit core and no stacktrace options ([250ecb5](https://github.com/zauberhaus/logger/commit/250ecb58d728f8646ba554879f04e6d65da071d0))
+
 ## [1.4.4](https://github.com/zauberhaus/logger/compare/v1.4.3...v1.4.4) (2026-07-29)
 
 
