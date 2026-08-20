@@ -92,7 +92,11 @@ func NewLogger(options ...Option) logger.Logger {
 		o.options = append(o.options, zap.ErrorOutput(eo))
 	}
 
-	o.options = append(o.options, zap.AddStacktrace(zap.ErrorLevel))
+	if o.noStacktrace {
+		o.options = append(o.options, zap.AddStacktrace(zapcore.InvalidLevel))
+	} else {
+		o.options = append(o.options, zap.AddStacktrace(zap.ErrorLevel))
+	}
 
 	if o.sampling != nil {
 		o.options = append(o.options, zap.WrapCore(func(core zapcore.Core) zapcore.Core {
@@ -121,7 +125,14 @@ func NewLogger(options ...Option) logger.Logger {
 		encoder = zapcore.NewConsoleEncoder(encoderCfg)
 	}
 
-	core := newLevelCore(zapcore.NewCore(encoder, ws, zapcore.DebugLevel), enabler)
+	var writeCore zapcore.Core
+	if o.split != nil {
+		writeCore = newSplitCore(encoder, ws, zapcore.AddSync(o.split.sink), Level(o.split.level))
+	} else {
+		writeCore = zapcore.NewCore(encoder, ws, zapcore.DebugLevel)
+	}
+
+	core := newLevelCore(writeCore, enabler)
 	logger = zap.New(core, o.options...)
 
 	if len(o.fields) > 0 {

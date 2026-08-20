@@ -64,6 +64,23 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, ws, opts.synker[0])
 	})
 
+	t.Run("WithErrorSink", func(t *testing.T) {
+		opts := &ZapOptions{}
+		var buf bytes.Buffer
+		WithErrorSink(&buf).Set(opts)
+		assert.Len(t, opts.errorSinks, 1)
+		assert.Equal(t, &buf, opts.errorSinks[0])
+	})
+
+	t.Run("WithErrorSink replaces previous sinks", func(t *testing.T) {
+		opts := &ZapOptions{}
+		var buf1, buf2 bytes.Buffer
+		WithErrorSink(&buf1).Set(opts)
+		WithErrorSink(&buf2).Set(opts)
+		assert.Len(t, opts.errorSinks, 1)
+		assert.Equal(t, &buf2, opts.errorSinks[0])
+	})
+
 	t.Run("WithErrorSinks", func(t *testing.T) {
 		opts := &ZapOptions{}
 		var buf bytes.Buffer
@@ -83,7 +100,15 @@ func TestOptions(t *testing.T) {
 		opts := &ZapOptions{}
 		WithStdErr().Set(opts)
 		assert.Len(t, opts.errorSinks, 1)
-		assert.Equal(t, os.Stdout, opts.errorSinks[0])
+		assert.Equal(t, os.Stderr, opts.errorSinks[0])
+	})
+
+	t.Run("WithLevelSplit", func(t *testing.T) {
+		opts := &ZapOptions{}
+		var buf bytes.Buffer
+		WithLevelSplit(logger.ErrorLevel, &buf).Set(opts)
+		assert.Equal(t, logger.ErrorLevel, opts.split.level)
+		assert.Equal(t, &buf, opts.split.sink)
 	})
 
 	t.Run("WithOutput", func(t *testing.T) {
@@ -131,6 +156,13 @@ func TestOptions(t *testing.T) {
 		sampling := &SamplingConfig{}
 		WithSampling(sampling).Set(opts)
 		assert.Equal(t, sampling, opts.sampling)
+	})
+
+	t.Run("DisableStacktrace", func(t *testing.T) {
+		opts := &ZapOptions{}
+		assert.False(t, opts.noStacktrace)
+		DisableStacktrace().Set(opts)
+		assert.True(t, opts.noStacktrace)
 	})
 
 	t.Run("optionFunc", func(t *testing.T) {
