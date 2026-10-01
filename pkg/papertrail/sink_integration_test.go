@@ -69,7 +69,7 @@ func TestSinkIntegration_Batch(t *testing.T) {
 	defer w.Close()
 
 	for i := range 3 {
-		_, err := w.Write([]byte(fmt.Sprintf(`{"msg":"event %d"}`, i)))
+		_, err := w.Write(fmt.Appendf(nil, `{"msg":"event %d"}`, i))
 		require.NoError(t, err)
 	}
 	time.Sleep(200 * time.Millisecond)
