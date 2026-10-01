@@ -43,7 +43,7 @@ func TestSinkIntegration_SendsEvent(t *testing.T) {
 		t.Skip("missing SPLUNK_HEC_TOKEN env variable")
 	}
 
-	w, err := splunk.NewSink(hecURL, token),
+	w, err := splunk.NewSink(hecURL, token,
 		clientOpt,
 		splunk.WithSource("integration-test"),
 		splunk.WithSourcetype("_json"),
@@ -96,7 +96,7 @@ func TestSinkIntegration_Batch(t *testing.T) {
 	defer w.Close()
 
 	for i := range 3 {
-		_, err := w.Write([]byte(fmt.Sprintf(`{"msg":"event %d"}`, i)))
+		_, err := w.Write(fmt.Appendf(nil, `{"msg":"event %d"}`, i))
 		require.NoError(t, err)
 	}
 	time.Sleep(200 * time.Millisecond)
