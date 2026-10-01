@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/zauberhaus/logger/compare/v1.5.0...v1.6.0) (2026-10-01)
+
+
+### Features
+
+* add syslog sink ([1c56966](https://github.com/zauberhaus/logger/commit/1c56966e965dd5fb4630d656a89ed60c29b39d80))
+
 ## [1.5.0](https://github.com/zauberhaus/logger/compare/v1.4.4...v1.5.0) (2026-08-20)
 
 
