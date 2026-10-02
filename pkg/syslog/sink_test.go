@@ -434,7 +434,7 @@ func selfSignedCert(t *testing.T) (tls.Certificate, *x509.CertPool) {
 func TestSink_TCPServerGone(t *testing.T) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	_, drop := acceptLines(l)
+	lines, drop := acceptLines(l)
 
 	s, err := syslog.NewSink(l.Addr().String(),
 		syslog.WithNetwork(syslog.NetworkTCP),
@@ -442,6 +442,12 @@ func TestSink_TCPServerGone(t *testing.T) {
 	)
 	require.NoError(t, err)
 	defer s.Close()
+
+	// Wait until the server has accepted and registered the connection, so
+	// drop closes it; otherwise it may be accepted after drop and stay open.
+	_, err = s.Write([]byte("before"))
+	require.NoError(t, err)
+	assert.Contains(t, nextLine(t, lines), "before")
 
 	require.NoError(t, l.Close())
 	drop()
