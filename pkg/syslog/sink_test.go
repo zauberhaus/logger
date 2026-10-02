@@ -1,3 +1,4 @@
+// cspell:ignore fakehost hllo héllo myapp NILVALUE sctp tmpl
 package syslog_test
 
 import (
@@ -8,8 +9,12 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"io"
 	"math/big"
 	"net"
+	"regexp"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -42,8 +47,8 @@ func readPacket(t *testing.T, conn *net.UDPConn) string {
 	return string(buf[:n])
 }
 
-// acceptLines accepts connections on l and sends every received line to the
-// returned channel. The returned function closes all accepted connections.
+// acceptLines accepts connections on l and sends every received octet-counted
+// frame to the returned channel. The returned function closes all accepted connections.
 func acceptLines(l net.Listener) (<-chan string, func()) {
 	var (
 		mu    sync.Mutex
@@ -64,11 +69,14 @@ func acceptLines(l net.Listener) (<-chan string, func()) {
 
 			go func() {
 				defer c.Close()
-				sc := bufio.NewScanner(c)
-				for sc.Scan() {
-					lines <- sc.Text()
+				r := bufio.NewReader(c)
+				for {
+					msg, err := readFrame(r)
+					if err != nil {
+						return
+					}
+					lines <- msg
 				}
-				_ = sc.Err()
 			}()
 		}
 	}()
@@ -80,6 +88,23 @@ func acceptLines(l net.Listener) (<-chan string, func()) {
 			c.Close()
 		}
 	}
+}
+
+// readFrame reads one RFC 6587 octet-counted frame: "<len> <msg>".
+func readFrame(r *bufio.Reader) (string, error) {
+	prefix, err := r.ReadString(' ')
+	if err != nil {
+		return "", err
+	}
+	n, err := strconv.Atoi(strings.TrimSuffix(prefix, " "))
+	if err != nil {
+		return "", err
+	}
+	buf := make([]byte, n)
+	if _, err := io.ReadFull(r, buf); err != nil {
+		return "", err
+	}
+	return string(buf), nil
 }
 
 func nextLine(t *testing.T, lines <-chan string) string {
@@ -214,6 +239,29 @@ func TestSink_TCP(t *testing.T) {
 
 	assert.Regexp(t, `^<11>1 \S+ myhost myapp \d+ - - \{"level":"error","msg":"one"\}$`, nextLine(t, lines))
 	assert.Regexp(t, `^<14>1 .* \{"level":"info","msg":"two"\}$`, nextLine(t, lines))
+}
+
+func TestSink_TCPEmbeddedNewlineStaysInOneMessage(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer l.Close()
+	lines, _ := acceptLines(l)
+
+	s, err := syslog.NewSink(l.Addr().String(),
+		syslog.WithNetwork(syslog.NetworkTCP),
+		syslog.WithHostname("myhost"),
+	)
+	require.NoError(t, err)
+	defer s.Close()
+
+	forged := "<10>1 2026-01-01T00:00:00Z fakehost sshd - - - forged"
+	_, err = s.Write([]byte("first\n" + forged + "\n"))
+	require.NoError(t, err)
+	_, err = s.Write([]byte("second\n"))
+	require.NoError(t, err)
+
+	assert.Regexp(t, `^<14>1 \S+ myhost \S+ \d+ - - first\n`+regexp.QuoteMeta(forged)+`$`, nextLine(t, lines))
+	assert.Regexp(t, ` - - second$`, nextLine(t, lines))
 }
 
 func TestSink_TCPReconnects(t *testing.T) {
@@ -381,4 +429,180 @@ func selfSignedCert(t *testing.T) (tls.Certificate, *x509.CertPool) {
 	pool.AddCert(parsed)
 
 	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}, pool
+}
+
+func TestSink_TCPServerGone(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	lines, drop := acceptLines(l)
+
+	s, err := syslog.NewSink(l.Addr().String(),
+		syslog.WithNetwork(syslog.NetworkTCP),
+		syslog.WithDialTimeout(time.Second),
+	)
+	require.NoError(t, err)
+	defer s.Close()
+
+	// Wait until the server has accepted and registered the connection, so
+	// drop closes it; otherwise it may be accepted after drop and stay open.
+	_, err = s.Write([]byte("before"))
+	require.NoError(t, err)
+	assert.Contains(t, nextLine(t, lines), "before")
+
+	require.NoError(t, l.Close())
+	drop()
+
+	// Writes may still land in the dead connection's buffer; once the loss is
+	// detected, reconnecting fails and the error is returned.
+	require.Eventually(t, func() bool {
+		_, err := s.Write([]byte("lost"))
+		return err != nil
+	}, 3*time.Second, 10*time.Millisecond)
+
+	_, err = s.Write([]byte("still down"))
+	assert.ErrorContains(t, err, "syslog: send log:")
+}
+
+func TestSink_EmptyHeaderFieldsBecomeNil(t *testing.T) {
+	srv, addr := listenUDP(t)
+
+	s, err := syslog.NewSink(addr,
+		syslog.WithAppName("   "),
+		syslog.WithHostname("ééé"),
+	)
+	require.NoError(t, err)
+	defer s.Close()
+
+	_, err = s.Write([]byte("x"))
+	require.NoError(t, err)
+
+	// RFC 5424 NILVALUE "-" for fields with no printable characters.
+	assert.Regexp(t, `^<14>1 \S+ - - \d+ - - x$`, readPacket(t, srv))
+}
+
+func TestSink_UnterminatedLevelUsesDefaultSeverity(t *testing.T) {
+	srv, addr := listenUDP(t)
+
+	s, err := syslog.NewSink(addr, syslog.WithDefaultSeverity(syslog.SeverityNotice))
+	require.NoError(t, err)
+	defer s.Close()
+
+	_, err = s.Write([]byte(`{"level":"err`))
+	require.NoError(t, err)
+
+	// user (1) * 8 + notice (5) = 13
+	assert.Contains(t, readPacket(t, srv), "<13>1 ")
+}
+
+func TestWithSyslog_Error(t *testing.T) {
+	_, err := syslog.WithSyslog("127.0.0.1:514", syslog.WithNetwork("sctp"))
+	assert.ErrorContains(t, err, `syslog: unsupported network "sctp"`)
+}
+
+func TestSink_Formats(t *testing.T) {
+	tests := map[string]struct {
+		format syslog.Format
+		want   string
+	}{
+		"rfc5424": {
+			format: syslog.FormatRFC5424,
+			want:   `^<134>1 \d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{6}(Z|[+-]\d\d:\d\d) myhost myapp 42 - - hello$`,
+		},
+		"forward": {
+			format: syslog.FormatForward,
+			want:   `^<134>\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{6}(Z|[+-]\d\d:\d\d) myhost myapp\[42\]: hello$`,
+		},
+		"syslog protocol 23": {
+			format: syslog.FormatSyslogProtocol23,
+			want:   `^<134>1 \d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{6}(Z|[+-]\d\d:\d\d) myhost myapp 42 - - hello$`,
+		},
+		"traditional forward": {
+			format: syslog.FormatTraditionalForward,
+			want:   `^<134>[A-Z][a-z]{2} [ \d]\d \d\d:\d\d:\d\d myhost myapp\[42\]: hello$`,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			srv, addr := listenUDP(t)
+
+			s, err := syslog.NewSink(addr,
+				syslog.WithFormat(tt.format),
+				syslog.WithAppName("myapp"),
+				syslog.WithHostname("myhost"),
+				syslog.WithProcID("42"),
+				syslog.WithFacility(syslog.FacilityLocal0),
+			)
+			require.NoError(t, err)
+			defer s.Close()
+
+			_, err = s.Write([]byte("hello\n"))
+			require.NoError(t, err)
+
+			assert.Regexp(t, tt.want, readPacket(t, srv))
+		})
+	}
+}
+
+func TestSink_TraditionalForwardOverTCP(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer l.Close()
+	lines, _ := acceptLines(l)
+
+	s, err := syslog.NewSink(l.Addr().String(),
+		syslog.WithNetwork(syslog.NetworkTCP),
+		syslog.WithFormat(syslog.FormatTraditionalForward),
+		syslog.WithHostname("myhost"),
+		syslog.WithAppName("myapp"),
+		syslog.WithProcID("42"),
+	)
+	require.NoError(t, err)
+	defer s.Close()
+
+	_, err = s.Write([]byte(`{"level":"error","msg":"boom"}`))
+	require.NoError(t, err)
+
+	// user (1) * 8 + error (3) = 11
+	assert.Regexp(t, `^<11>\S+ +\d+ \S+ myhost myapp\[42\]: \{"level":"error","msg":"boom"\}$`, nextLine(t, lines))
+}
+
+func TestSink_BSDTagLimitedTo32Chars(t *testing.T) {
+	tests := map[string]struct {
+		app, procID string
+		want        string
+	}{
+		"fits":         {app: "myapp", procID: "42", want: "myapp[42]:"},
+		"long app":     {app: strings.Repeat("a", 40), procID: "12345", want: strings.Repeat("a", 24) + "[12345]:"},
+		"long proc id": {app: "myapp", procID: strings.Repeat("9", 40), want: "myapp:"},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			srv, addr := listenUDP(t)
+
+			s, err := syslog.NewSink(addr,
+				syslog.WithFormat(syslog.FormatForward),
+				syslog.WithHostname("h"),
+				syslog.WithAppName(tt.app),
+				syslog.WithProcID(tt.procID),
+			)
+			require.NoError(t, err)
+			defer s.Close()
+
+			_, err = s.Write([]byte("x"))
+			require.NoError(t, err)
+
+			msg := readPacket(t, srv)
+			assert.True(t, strings.HasSuffix(msg, " h "+tt.want+" x"), msg)
+			assert.LessOrEqual(t, len(tt.want), 32)
+		})
+	}
+}
+
+func TestNewSink_UnsupportedFormat(t *testing.T) {
+	_, addr := listenUDP(t)
+
+	_, err := syslog.NewSink(addr, syslog.WithFormat(syslog.Format(99)))
+	assert.EqualError(t, err, "syslog: unsupported format 99")
 }

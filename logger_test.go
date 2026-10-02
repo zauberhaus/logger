@@ -23,3 +23,15 @@ func TestLogger(t *testing.T) {
 	l4 := logger.GetLogger(ctx)
 	assert.Equal(t, l3, l4)
 }
+
+func TestGet(t *testing.T) {
+	def := memory.NewLogger()
+	logger.SetLogger(def)
+
+	assert.Equal(t, def, logger.Get(nil)) //nolint:staticcheck // nil context is handled
+	assert.Equal(t, def, logger.Get(context.TODO()))
+	assert.Equal(t, def, logger.Get(context.WithValue(context.TODO(), logger.LoggerKey, "not a logger")))
+
+	l := memory.NewLogger()
+	assert.Equal(t, l, logger.Get(logger.AddLogger(context.TODO(), l)))
+}

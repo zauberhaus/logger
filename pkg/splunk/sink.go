@@ -31,6 +31,7 @@ type Sink struct {
 	batchSize     int
 	flushInterval time.Duration
 	onError       func(error)
+	allowHTTP     bool
 
 	mu    sync.Mutex
 	lines [][]byte
@@ -58,6 +59,11 @@ func NewSink(hecURL string, token string, opts ...Option) (logger.Sink, error) {
 	for _, opt := range opts {
 		opt.apply(w)
 	}
+
+	if err := logger.CheckEndpoint(w.url, w.allowHTTP); err != nil {
+		return nil, fmt.Errorf("splunk: %w", err)
+	}
+	w.client = logger.SecureClient(w.client, w.allowHTTP)
 
 	if err := w.healthCheck(); err != nil {
 		return nil, err
@@ -172,14 +178,14 @@ func (w *Sink) flush() error {
 }
 
 // buildPayload constructs newline-delimited Splunk HEC events.
-// For JSON log lines produced by zap JSONOutput, the event field is a raw JSON
+// For valid JSON object lines (e.g. zap JSONOutput), the event field is a raw JSON
 // object; otherwise the line is encoded as a JSON string.
 func (w *Sink) buildPayload(lines [][]byte) []byte {
 	var buf bytes.Buffer
 	for _, line := range lines {
 		trimmed := bytes.TrimSpace(line)
 		buf.WriteString(`{"event":`)
-		if len(trimmed) > 1 && trimmed[0] == '{' && trimmed[len(trimmed)-1] == '}' {
+		if len(trimmed) > 1 && trimmed[0] == '{' && trimmed[len(trimmed)-1] == '}' && json.Valid(trimmed) {
 			buf.Write(trimmed)
 		} else {
 			eventJSON, _ := json.Marshal(string(trimmed))

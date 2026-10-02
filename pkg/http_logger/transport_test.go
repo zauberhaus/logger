@@ -560,3 +560,155 @@ func TestLoggingTransportBinaryResponseBody(t *testing.T) {
 	assert.Contains(t, txt, "response body:\n")
 	assert.Contains(t, txt, "ff fe 00 01")
 }
+
+type trackingBody struct {
+	io.Reader
+	closed bool
+}
+
+func (b *trackingBody) Close() error {
+	b.closed = true
+	return nil
+}
+
+type stubTransport struct {
+	resp *http.Response
+}
+
+func (s *stubTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return s.resp, nil
+}
+
+func gzipped(t *testing.T, data []byte) []byte {
+	t.Helper()
+	var b bytes.Buffer
+	gw := gzip.NewWriter(&b)
+	_, err := gw.Write(data)
+	require.NoError(t, err)
+	require.NoError(t, gw.Close())
+	return b.Bytes()
+}
+
+func TestLoggingTransportClosesDecodedBody(t *testing.T) {
+	body := &trackingBody{Reader: bytes.NewReader(gzipped(t, []byte("payload")))}
+	stub := &stubTransport{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Encoding": {"gzip"}},
+		Body:       body,
+	}}
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+
+	resp, err := http_logger.NewLoggingTransport(stub, l).RoundTrip(req)
+	require.NoError(t, err)
+
+	assert.True(t, body.closed)
+	data, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, "payload", string(data))
+	assert.Equal(t, int64(7), resp.ContentLength)
+}
+
+func TestLoggingTransportLargeBodyIsStreamed(t *testing.T) {
+	// 8 MiB of zeros compresses to ~8 KiB: a small decompression bomb.
+	const size = 8 << 20
+	body := &trackingBody{Reader: bytes.NewReader(gzipped(t, make([]byte, size)))}
+	stub := &stubTransport{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Encoding": {"gzip"}, "Content-Length": {"65536"}},
+		Body:       body,
+	}}
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel), memory.WithBufferSize(8<<20))
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+
+	resp, err := http_logger.NewLoggingTransport(stub, l).RoundTrip(req)
+	require.NoError(t, err)
+
+	assert.False(t, body.closed)
+	assert.Equal(t, "", resp.Header.Get("Content-Encoding"))
+	assert.Equal(t, "", resp.Header.Get("Content-Length"))
+	assert.Equal(t, int64(-1), resp.ContentLength)
+	assert.Contains(t, string(l.Bytes()), "response body (truncated):")
+
+	n, err := io.Copy(io.Discard, resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, int64(size), n)
+
+	require.NoError(t, resp.Body.Close())
+	assert.True(t, body.closed)
+}
+
+func TestLoggingTransportLargeRequestBodyIsStreamed(t *testing.T) {
+	const size = 4 << 20
+	var received int64
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		received, _ = io.Copy(io.Discard, r.Body)
+	}))
+	defer server.Close()
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel), memory.WithBufferSize(8<<20))
+	client := &http.Client{Transport: http_logger.NewLoggingTransport(http.DefaultTransport, l)}
+
+	resp, err := client.Post(server.URL, "application/octet-stream", bytes.NewReader(bytes.Repeat([]byte("a"), size)))
+	require.NoError(t, err)
+	resp.Body.Close()
+
+	assert.Equal(t, int64(size), received)
+	assert.Contains(t, string(l.Bytes()), "request body (truncated):")
+}
+
+func TestLoggingTransportInvalidGzip(t *testing.T) {
+	body := &trackingBody{Reader: bytes.NewReader([]byte("not gzip"))}
+	stub := &stubTransport{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Encoding": {"gzip"}},
+		Body:       body,
+	}}
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+
+	resp, err := http_logger.NewLoggingTransport(stub, l).RoundTrip(req)
+	require.Error(t, err)
+	assert.Nil(t, resp)
+	assert.True(t, body.closed)
+}
+
+type failingReader struct{}
+
+func (failingReader) Read([]byte) (int, error) {
+	return 0, errors.New("read failed")
+}
+
+func TestLoggingTransportResponseReadError(t *testing.T) {
+	body := &trackingBody{Reader: io.MultiReader(bytes.NewReader([]byte("partial")), failingReader{})}
+	stub := &stubTransport{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{},
+		Body:       body,
+	}}
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+
+	resp, err := http_logger.NewLoggingTransport(stub, l).RoundTrip(req)
+	assert.ErrorContains(t, err, "read failed")
+	assert.Nil(t, resp)
+	assert.True(t, body.closed)
+}
+
+func TestLoggingTransportRequestReadError(t *testing.T) {
+	stub := &stubTransport{}
+	body := &trackingBody{Reader: failingReader{}}
+
+	l := memory.NewLogger(zap.WithLevel(logger.DebugLevel))
+	req := httptest.NewRequest(http.MethodPost, "http://example.com", nil)
+	req.Body = body
+
+	resp, err := http_logger.NewLoggingTransport(stub, l).RoundTrip(req)
+	assert.ErrorContains(t, err, "read failed")
+	assert.Nil(t, resp)
+	assert.True(t, body.closed)
+}

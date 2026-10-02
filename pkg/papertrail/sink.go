@@ -3,6 +3,7 @@ package papertrail
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -12,54 +13,83 @@ import (
 )
 
 const (
-	defaultBatchSize2     = 100
-	defaultFlushInterval2 = 5 * time.Second
-	maxPayloadBytes2      = 1 * 1024 * 1024
+	defaultBatchSize     = 100
+	defaultFlushInterval = 5 * time.Second
+	defaultQueueSize     = 10000
+	defaultTimeout       = 10 * time.Second
+	maxPayloadBytes      = 1 * 1024 * 1024
 )
 
-// Writer ships logs to the SolarWinds Papertrail HTTP ingestion API
+var (
+	ErrQueueFull = errors.New("papertrail: queue full, log line dropped")
+	ErrClosed    = errors.New("papertrail: sink closed")
+)
+
+// Sink ships logs to the SolarWinds Papertrail HTTP ingestion API
 // (application/octet-stream, Bearer auth).
+//
+// Write never blocks on the network: lines go into a bounded input queue and
+// a background goroutine batches and delivers them. When the queue is full,
+// new lines are dropped and ErrQueueFull is reported.
 type Sink struct {
 	endpoint   string
 	token      string
 	httpClient *http.Client
 	onError    func(error)
+	allowHTTP  bool
 
 	batchSize     int
 	flushInterval time.Duration
+	queueSize     int
 
-	mu    sync.Mutex
+	mu     sync.RWMutex
+	closed bool
+
+	queue     chan []byte
+	syncReq   chan chan error
+	stop      chan struct{}
+	done      chan struct{}
+	closeErr  error
+	closeOnce sync.Once
+
+	// Owned by the run goroutine.
 	lines [][]byte
 	size  int
-
-	ctx    context.Context
-	cancel context.CancelFunc
-	done   chan struct{}
 }
 
 func NewSink(endpoint, token string, opts ...SinkOption) (logger.Sink, error) {
 	w := &Sink{
 		endpoint:      endpoint,
 		token:         token,
-		httpClient:    http.DefaultClient,
-		batchSize:     defaultBatchSize2,
-		flushInterval: defaultFlushInterval2,
-		done:          make(chan struct{}),
+		httpClient:    &http.Client{Timeout: defaultTimeout},
+		batchSize:     defaultBatchSize,
+		flushInterval: defaultFlushInterval,
+		queueSize:     defaultQueueSize,
 	}
 	for _, opt := range opts {
 		opt(w)
 	}
 
+	if err := logger.CheckEndpoint(w.endpoint, w.allowHTTP); err != nil {
+		return nil, fmt.Errorf("papertrail: %w", err)
+	}
+	w.httpClient = logger.SecureClient(w.httpClient, w.allowHTTP)
+
 	if err := w.healthCheck(); err != nil {
 		return nil, fmt.Errorf("papertrail: health check: %w", err)
 	}
 
-	w.ctx, w.cancel = context.WithCancel(context.Background())
+	w.queue = make(chan []byte, w.queueSize)
+	w.syncReq = make(chan chan error)
+	w.stop = make(chan struct{})
+	w.done = make(chan struct{})
 	go w.run()
+
 	return w, nil
 }
 
-// Write buffers a log line. Implements io.Writer and zapcore.WriteSyncer.
+// Write enqueues a log line without waiting for delivery. Implements io.Writer
+// and zapcore.WriteSyncer.
 func (w *Sink) Write(p []byte) (int, error) {
 	line := bytes.TrimRight(p, "\n")
 	if len(line) == 0 {
@@ -68,43 +98,84 @@ func (w *Sink) Write(p []byte) (int, error) {
 	dst := make([]byte, len(line))
 	copy(dst, line)
 
-	w.mu.Lock()
-	w.lines = append(w.lines, dst)
-	w.size += len(dst)
-	flush := len(w.lines) >= w.batchSize || w.size >= maxPayloadBytes2
-	w.mu.Unlock()
+	w.mu.RLock()
+	defer w.mu.RUnlock()
 
-	if flush {
-		if err := w.flush(); err != nil {
-			return 0, err
-		}
+	if w.closed {
+		return 0, w.handleError(ErrClosed)
 	}
-	return len(p), nil
+
+	select {
+	case w.queue <- dst:
+		return len(p), nil
+	default:
+		return 0, w.handleError(ErrQueueFull)
+	}
 }
 
-// Sync flushes buffered logs immediately. Implements zapcore.WriteSyncer.
+// Sync delivers all lines written before the call and waits for the result.
+// Implements zapcore.WriteSyncer.
 func (w *Sink) Sync() error {
-	return w.flush()
+	reply := make(chan error, 1)
+	select {
+	case w.syncReq <- reply:
+		return <-reply
+	case <-w.done:
+		return nil
+	}
 }
 
-// Close flushes remaining logs and stops the background flusher.
+// Close stops accepting lines, delivers everything still queued and stops
+// the background worker.
 func (w *Sink) Close() error {
-	w.cancel()
-	<-w.done
-	return w.flush()
+	w.closeOnce.Do(func() {
+		w.mu.Lock()
+		w.closed = true
+		w.mu.Unlock()
+
+		close(w.stop)
+		<-w.done
+	})
+	return w.closeErr
 }
 
 func (w *Sink) run() {
 	defer close(w.done)
+
 	t := time.NewTicker(w.flushInterval)
 	defer t.Stop()
+
 	for {
 		select {
+		case line := <-w.queue:
+			w.add(line)
 		case <-t.C:
 			w.flush()
-		case <-w.ctx.Done():
+		case reply := <-w.syncReq:
+			w.drain()
+			reply <- w.flush()
+		case <-w.stop:
+			// Close holds no writers past this point, so the queue is final.
+			w.drain()
+			w.closeErr = w.flush()
 			return
 		}
+	}
+}
+
+// add appends a line to the current batch and flushes when it is full.
+func (w *Sink) add(line []byte) {
+	w.lines = append(w.lines, line)
+	w.size += len(line)
+	if len(w.lines) >= w.batchSize || w.size >= maxPayloadBytes {
+		w.flush()
+	}
+}
+
+// drain moves every line currently in the queue into batches.
+func (w *Sink) drain() {
+	for n := len(w.queue); n > 0; n-- {
+		w.add(<-w.queue)
 	}
 }
 
@@ -128,16 +199,14 @@ func (w *Sink) healthCheck() error {
 	return nil
 }
 
+// flush sends the current batch. Must only be called from the run goroutine.
 func (w *Sink) flush() error {
-	w.mu.Lock()
 	if len(w.lines) == 0 {
-		w.mu.Unlock()
 		return nil
 	}
 	lines := w.lines
 	w.lines = nil
 	w.size = 0
-	w.mu.Unlock()
 
 	body := bytes.Join(lines, []byte("\n"))
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, w.endpoint, bytes.NewReader(body))

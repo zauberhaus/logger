@@ -35,7 +35,7 @@ jobs:
 
       - name: Checkout Code 
         if: steps.release.outputs.prs_created == 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Merge Pull Request
         if: steps.release.outputs.prs_created == 'true'

@@ -26,6 +26,11 @@ func WithTLSConfig(cfg *tls.Config) Option {
 	}
 }
 
+// WithFormat sets the message format. Defaults to FormatRFC5424.
+func WithFormat(f Format) Option {
+	return func(s *Sink) { s.msgFormat = f }
+}
+
 // WithFacility sets the syslog facility. Defaults to FacilityUser.
 func WithFacility(f Facility) Option {
 	return func(s *Sink) { s.facility = f }
@@ -39,6 +44,12 @@ func WithAppName(name string) Option {
 // WithHostname sets the RFC 5424 HOSTNAME field. Defaults to os.Hostname.
 func WithHostname(host string) Option {
 	return func(s *Sink) { s.hostname = host }
+}
+
+// WithProcID sets the RFC 5424 PROCID field, also used in the BSD tag
+// "APP-NAME[PROCID]:". Defaults to the process ID.
+func WithProcID(id string) Option {
+	return func(s *Sink) { s.procID = id }
 }
 
 // WithDefaultSeverity sets the severity used for lines whose level cannot be

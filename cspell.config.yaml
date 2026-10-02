@@ -7,11 +7,14 @@ ignorePaths:
   - cspell.config.yaml
 words:
   - agiledragon
+  - AKID
   - ALLCAPS
   - alllower
   - apiurl
+  - awsconfig
   - boumenot
   - bufconn
+  - cloudwatchlogs
   - CLUSTERDOWN
   - coverprofile
   - creasty

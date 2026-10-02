@@ -1,4 +1,3 @@
-// cspell:words UUCP
 package syslog
 
 import (
@@ -15,48 +14,13 @@ import (
 	"github.com/zauberhaus/logger/pkg/logger"
 )
 
-// Facility is a syslog facility code (RFC 5424, section 6.2.1).
-type Facility int
-
 const (
-	FacilityKern Facility = iota
-	FacilityUser
-	FacilityMail
-	FacilityDaemon
-	FacilityAuth
-	FacilitySyslog
-	FacilityLPR
-	FacilityNews
-	FacilityUUCP
-	FacilityCron
-	FacilityAuthPriv
-	FacilityFTP
-)
+	// RFC 5424 allows at most six digits of fractional seconds.
+	timestampRFC3339Micro = "2006-01-02T15:04:05.000000Z07:00"
+	timestampBSD          = "Jan _2 15:04:05"
 
-// Local use facilities.
-const (
-	FacilityLocal0 Facility = 16 + iota
-	FacilityLocal1
-	FacilityLocal2
-	FacilityLocal3
-	FacilityLocal4
-	FacilityLocal5
-	FacilityLocal6
-	FacilityLocal7
-)
-
-// Severity is a syslog severity code (RFC 5424, section 6.2.1).
-type Severity int
-
-const (
-	SeverityEmergency Severity = iota
-	SeverityAlert
-	SeverityCritical
-	SeverityError
-	SeverityWarning
-	SeverityNotice
-	SeverityInfo
-	SeverityDebug
+	// RFC 3164 limits the TAG to 32 characters.
+	maxTagLen = 32
 )
 
 // Supported values for WithNetwork.
@@ -69,8 +33,9 @@ const (
 const defaultTimeout = 5 * time.Second
 
 // Sink ships log lines to a remote syslog server as RFC 5424 messages.
-// Over TCP and TLS, messages are newline-delimited (RFC 6587 non-transparent
-// framing) and the connection is re-established after a failed write.
+// Over TCP and TLS, messages use octet-counting framing (RFC 6587 section
+// 3.4.1, RFC 5425 section 4.3), so embedded newlines cannot split a message,
+// and the connection is re-established after a failed write.
 type Sink struct {
 	address   string
 	network   string
@@ -78,6 +43,7 @@ type Sink struct {
 	timeout   time.Duration
 	onError   func(error)
 
+	msgFormat       Format
 	facility        Facility
 	defaultSeverity Severity
 	appName         string
@@ -109,6 +75,12 @@ func NewSink(address string, opts ...Option) (logger.Sink, error) {
 	case NetworkUDP, NetworkTCP, NetworkTLS:
 	default:
 		return nil, fmt.Errorf("syslog: unsupported network %q", s.network)
+	}
+
+	switch s.msgFormat {
+	case FormatRFC5424, FormatForward, FormatTraditionalForward:
+	default:
+		return nil, fmt.Errorf("syslog: unsupported format %d", s.msgFormat)
 	}
 
 	if s.appName == "" {
@@ -222,28 +194,60 @@ func (s *Sink) write(msg []byte) error {
 	return err
 }
 
-// format builds an RFC 5424 message:
-//
-//	<PRI>1 TIMESTAMP HOSTNAME APP-NAME PROCID MSGID STRUCTURED-DATA MSG
-//
-// Over TCP the message is terminated by a newline.
+// format builds a message in the configured Format. Over TCP and TLS the
+// message is prefixed with its length in octets.
 func (s *Sink) format(line []byte, ts time.Time) []byte {
 	pri := int(s.facility)*8 + int(s.severity(line))
 
 	var b bytes.Buffer
 	b.Grow(len(line) + 96)
-	fmt.Fprintf(&b, "<%d>1 %s %s %s %s - - ",
-		pri,
-		ts.Format(time.RFC3339Nano),
-		field(s.hostname, 255),
-		field(s.appName, 48),
-		field(s.procID, 128),
-	)
-	b.Write(line)
-	if s.network != NetworkUDP {
-		b.WriteByte('\n')
+
+	switch s.msgFormat {
+	case FormatForward:
+		fmt.Fprintf(&b, "<%d>%s %s %s ",
+			pri,
+			ts.Format(timestampRFC3339Micro),
+			field(s.hostname, 255),
+			s.tag(),
+		)
+	case FormatTraditionalForward:
+		fmt.Fprintf(&b, "<%d>%s %s %s ",
+			pri,
+			ts.Format(timestampBSD),
+			field(s.hostname, 255),
+			s.tag(),
+		)
+	default:
+		fmt.Fprintf(&b, "<%d>1 %s %s %s %s - - ",
+			pri,
+			ts.Format(timestampRFC3339Micro),
+			field(s.hostname, 255),
+			field(s.appName, 48),
+			field(s.procID, 128),
+		)
 	}
-	return b.Bytes()
+	b.Write(line)
+
+	if s.network == NetworkUDP {
+		return b.Bytes()
+	}
+
+	msg := b.Bytes()
+	framed := make([]byte, 0, len(msg)+12)
+	framed = strconv.AppendInt(framed, int64(len(msg)), 10)
+	framed = append(framed, ' ')
+	return append(framed, msg...)
+}
+
+// tag builds the BSD syslog TAG "APP-NAME[PROCID]:". The app name is
+// shortened so the tag stays within 32 characters; the process ID is
+// dropped if it does not fit.
+func (s *Sink) tag() string {
+	pid := "[" + field(s.procID, maxTagLen) + "]:"
+	if len(pid) >= maxTagLen {
+		return field(s.appName, maxTagLen-1) + ":"
+	}
+	return field(s.appName, maxTagLen-len(pid)) + pid
 }
 
 // severity derives the severity from the level of a zap JSON line. Lines

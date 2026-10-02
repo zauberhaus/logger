@@ -6,6 +6,7 @@
 #   2. Waits for the PR checks, then merges it with a merge commit.
 #   3. Follows the Release Check workflow that the merge triggers on main.
 #      release-please then opens the release PR, which the workflow merges.
+#   4. Waits for the new GitHub release to appear and prints its version.
 #
 # With -v the workflow is additionally dispatched to force that version.
 #
@@ -15,13 +16,15 @@ set -euo pipefail
 
 BASE=main
 WORKFLOW=release-please.yml
+TIMEOUT=900
 
 usage() {
   cat <<EOF
-Usage: $(basename "$0") [-v VERSION] [-n] [-y]
+Usage: $(basename "$0") [-v VERSION] [-t SECONDS] [-n] [-y]
 
   -v VERSION  force the release version (e.g. 1.6.0) by dispatching the
               release workflow after the merge
+  -t SECONDS  how long to wait for the new release (default: $TIMEOUT)
   -n          only create the PR; do not wait, merge or start a release
   -y          do not ask for confirmation before merging
   -h          show this help
@@ -35,15 +38,18 @@ VERSION=
 PR_ONLY=false
 ASSUME_YES=false
 
-while getopts "v:nyh" opt; do
+while getopts "v:t:nyh" opt; do
   case "$opt" in
     v) VERSION=$OPTARG ;;
+    t) TIMEOUT=$OPTARG ;;
     n) PR_ONLY=true ;;
     y) ASSUME_YES=true ;;
     h) usage; exit 0 ;;
     *) usage >&2; exit 2 ;;
   esac
 done
+
+[[ $TIMEOUT =~ ^[0-9]+$ ]] || die "invalid timeout '$TIMEOUT' (expected seconds)"
 
 if [ -n "$VERSION" ]; then
   VERSION=${VERSION#v}
@@ -61,6 +67,26 @@ poll_run() {
       return 0
     fi
     sleep 3
+  done
+  return 1
+}
+
+# latest_release prints the tag of the latest GitHub release, or nothing if there is none.
+latest_release() {
+  gh release view --json tagName --jq .tagName 2>/dev/null || true
+}
+
+# wait_for_release waits until a release other than $1 is published (and, when
+# a version was forced, until that version is published) and prints its tag.
+wait_for_release() {
+  local before=$1 deadline=$((SECONDS + TIMEOUT)) tag
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    tag=$(latest_release)
+    if [ -n "$tag" ] && [ "$tag" != "$before" ] && { [ -z "$VERSION" ] || [ "$tag" = "v$VERSION" ]; }; then
+      echo "$tag"
+      return 0
+    fi
+    sleep 10
   done
   return 1
 }
@@ -91,6 +117,8 @@ git fetch --quiet origin
 if [ -n "$VERSION" ] && [ -n "$(git ls-remote --tags origin "refs/tags/v$VERSION")" ]; then
   die "tag v$VERSION already exists"
 fi
+
+RELEASE_BEFORE=$(latest_release)
 
 AHEAD=$(git rev-list --count "origin/$BASE..HEAD")
 [ "$AHEAD" -gt 0 ] || die "$HEAD_BRANCH has no commits that are not already in $BASE"
@@ -152,6 +180,13 @@ RELEASE_PR=$(gh pr list --base "$BASE" --head "release-please--branches--$BASE" 
 if [ -n "$RELEASE_PR" ]; then
   log "Release PR: $RELEASE_PR"
 else
-  log "No open release PR; it was merged by the workflow or there was nothing to release"
+  log "No open release PR; it was already merged by the workflow or there is nothing to release"
+fi
+
+log "Waiting for the new release (up to ${TIMEOUT}s, latest is ${RELEASE_BEFORE:-none})"
+if TAG=$(wait_for_release "$RELEASE_BEFORE"); then
+  log "Released $TAG: $(gh release view "$TAG" --json url --jq .url)"
+else
+  die "no new release after ${TIMEOUT}s; check ${RELEASE_PR:-the $WORKFLOW runs}"
 fi
 log "Done"

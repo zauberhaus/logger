@@ -53,6 +53,12 @@ func WithHTTPClient(client *http.Client) Option {
 	return optionFunc(func(w *Sink) { w.client = client })
 }
 
+// WithAllowHTTP permits a plain http HEC endpoint, e.g. for local tests. By
+// default only https endpoints are accepted.
+func WithAllowHTTP() Option {
+	return optionFunc(func(w *Sink) { w.allowHTTP = true })
+}
+
 // WithErrorHandler registers a callback invoked on delivery errors (e.g. network failures).
 func WithErrorHandler(fn func(error)) Option {
 	return optionFunc(func(w *Sink) { w.onError = fn })
