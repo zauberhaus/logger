@@ -1,3 +1,4 @@
+// cspell:ignore fakehost hllo héllo myapp NILVALUE sctp tmpl
 package syslog_test
 
 import (
@@ -490,4 +491,112 @@ func TestSink_UnterminatedLevelUsesDefaultSeverity(t *testing.T) {
 func TestWithSyslog_Error(t *testing.T) {
 	_, err := syslog.WithSyslog("127.0.0.1:514", syslog.WithNetwork("sctp"))
 	assert.ErrorContains(t, err, `syslog: unsupported network "sctp"`)
+}
+
+func TestSink_Formats(t *testing.T) {
+	tests := map[string]struct {
+		format syslog.Format
+		want   string
+	}{
+		"rfc5424": {
+			format: syslog.FormatRFC5424,
+			want:   `^<134>1 \d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{6}(Z|[+-]\d\d:\d\d) myhost myapp 42 - - hello$`,
+		},
+		"forward": {
+			format: syslog.FormatForward,
+			want:   `^<134>\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{6}(Z|[+-]\d\d:\d\d) myhost myapp\[42\]: hello$`,
+		},
+		"syslog protocol 23": {
+			format: syslog.FormatSyslogProtocol23,
+			want:   `^<134>1 \d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{6}(Z|[+-]\d\d:\d\d) myhost myapp 42 - - hello$`,
+		},
+		"traditional forward": {
+			format: syslog.FormatTraditionalForward,
+			want:   `^<134>[A-Z][a-z]{2} [ \d]\d \d\d:\d\d:\d\d myhost myapp\[42\]: hello$`,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			srv, addr := listenUDP(t)
+
+			s, err := syslog.NewSink(addr,
+				syslog.WithFormat(tt.format),
+				syslog.WithAppName("myapp"),
+				syslog.WithHostname("myhost"),
+				syslog.WithProcID("42"),
+				syslog.WithFacility(syslog.FacilityLocal0),
+			)
+			require.NoError(t, err)
+			defer s.Close()
+
+			_, err = s.Write([]byte("hello\n"))
+			require.NoError(t, err)
+
+			assert.Regexp(t, tt.want, readPacket(t, srv))
+		})
+	}
+}
+
+func TestSink_TraditionalForwardOverTCP(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer l.Close()
+	lines, _ := acceptLines(l)
+
+	s, err := syslog.NewSink(l.Addr().String(),
+		syslog.WithNetwork(syslog.NetworkTCP),
+		syslog.WithFormat(syslog.FormatTraditionalForward),
+		syslog.WithHostname("myhost"),
+		syslog.WithAppName("myapp"),
+		syslog.WithProcID("42"),
+	)
+	require.NoError(t, err)
+	defer s.Close()
+
+	_, err = s.Write([]byte(`{"level":"error","msg":"boom"}`))
+	require.NoError(t, err)
+
+	// user (1) * 8 + error (3) = 11
+	assert.Regexp(t, `^<11>\S+ +\d+ \S+ myhost myapp\[42\]: \{"level":"error","msg":"boom"\}$`, nextLine(t, lines))
+}
+
+func TestSink_BSDTagLimitedTo32Chars(t *testing.T) {
+	tests := map[string]struct {
+		app, procID string
+		want        string
+	}{
+		"fits":         {app: "myapp", procID: "42", want: "myapp[42]:"},
+		"long app":     {app: strings.Repeat("a", 40), procID: "12345", want: strings.Repeat("a", 24) + "[12345]:"},
+		"long proc id": {app: "myapp", procID: strings.Repeat("9", 40), want: "myapp:"},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			srv, addr := listenUDP(t)
+
+			s, err := syslog.NewSink(addr,
+				syslog.WithFormat(syslog.FormatForward),
+				syslog.WithHostname("h"),
+				syslog.WithAppName(tt.app),
+				syslog.WithProcID(tt.procID),
+			)
+			require.NoError(t, err)
+			defer s.Close()
+
+			_, err = s.Write([]byte("x"))
+			require.NoError(t, err)
+
+			msg := readPacket(t, srv)
+			assert.True(t, strings.HasSuffix(msg, " h "+tt.want+" x"), msg)
+			assert.LessOrEqual(t, len(tt.want), 32)
+		})
+	}
+}
+
+func TestNewSink_UnsupportedFormat(t *testing.T) {
+	_, addr := listenUDP(t)
+
+	_, err := syslog.NewSink(addr, syslog.WithFormat(syslog.Format(99)))
+	assert.EqualError(t, err, "syslog: unsupported format 99")
 }
