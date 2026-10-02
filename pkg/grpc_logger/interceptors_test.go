@@ -291,3 +291,79 @@ func TestStreamServerInterceptor_DebugEnabled_Error(t *testing.T) {
 	)
 	assert.ErrorIs(t, err, boom)
 }
+
+func TestStreamClientInterceptor_DebugEnabled_OpenError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	boom := errors.New("boom")
+	m := mock.NewMockLogger(ctrl)
+	m.EXPECT().IsDebugEnabled().Return(true)
+	m.EXPECT().Debugf(containsStr("[GRPC CLIENT STREAM]"), gomock.Any())
+	m.EXPECT().Errorf(containsStr("[GRPC CLIENT STREAM ERROR]"), gomock.Any(), gomock.Any(), gomock.Any())
+
+	interceptor := grpc_logger.StreamClientInterceptor(m)
+	stream, err := interceptor(context.Background(), &grpc.StreamDesc{}, nil, "/svc/Stream",
+		func(_ context.Context, _ *grpc.StreamDesc, _ *grpc.ClientConn, _ string, _ ...grpc.CallOption) (grpc.ClientStream, error) {
+			return nil, boom
+		},
+	)
+	assert.ErrorIs(t, err, boom)
+	assert.Nil(t, stream)
+}
+
+func TestStreamClientInterceptor_DebugEnabled_RecvError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	boom := errors.New("boom")
+	m := mock.NewMockLogger(ctrl)
+	m.EXPECT().IsDebugEnabled().Return(true)
+	m.EXPECT().Debugf(containsStr("[GRPC CLIENT STREAM]"), gomock.Any())
+	m.EXPECT().Debugf(containsStr("[GRPC CLIENT STREAM OPENED]"), gomock.Any(), gomock.Any())
+	m.EXPECT().Debugf(containsStr("[GRPC CLIENT STREAM RECV ERROR]"), gomock.Any(), boom)
+
+	interceptor := grpc_logger.StreamClientInterceptor(m)
+	stream, err := interceptor(context.Background(), &grpc.StreamDesc{}, nil, "/svc/Stream",
+		func(_ context.Context, _ *grpc.StreamDesc, _ *grpc.ClientConn, _ string, _ ...grpc.CallOption) (grpc.ClientStream, error) {
+			return &fakeClientStream{recvErr: boom}, nil
+		},
+	)
+	require.NoError(t, err)
+
+	assert.ErrorIs(t, stream.RecvMsg(nil), boom)
+}
+
+func TestStreamServerInterceptor_DebugEnabled_RecvErrors(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	boom := errors.New("boom")
+	m := mock.NewMockLogger(ctrl)
+	m.EXPECT().IsDebugEnabled().Return(true)
+	m.EXPECT().Debugf(containsStr("[GRPC SERVER STREAM]"), gomock.Any())
+	// Only the non-EOF error is logged; EOF means the client finished sending.
+	m.EXPECT().Debugf(containsStr("[GRPC SERVER STREAM RECV ERROR]"), gomock.Any(), boom)
+	m.EXPECT().Debugf(containsStr("[GRPC SERVER STREAM DONE]"), gomock.Any(), gomock.Any())
+
+	interceptor := grpc_logger.StreamServerInterceptor(m)
+	err := interceptor(nil, &fakeServerStream{recvErr: boom}, &grpc.StreamServerInfo{FullMethod: "/svc/Stream"},
+		func(_ any, ss grpc.ServerStream) error {
+			assert.ErrorIs(t, ss.RecvMsg(nil), boom)
+			return nil
+		},
+	)
+	require.NoError(t, err)
+
+	m.EXPECT().IsDebugEnabled().Return(true)
+	m.EXPECT().Debugf(containsStr("[GRPC SERVER STREAM]"), gomock.Any())
+	m.EXPECT().Debugf(containsStr("[GRPC SERVER STREAM DONE]"), gomock.Any(), gomock.Any())
+
+	err = interceptor(nil, &fakeServerStream{recvErr: io.EOF}, &grpc.StreamServerInfo{FullMethod: "/svc/Stream"},
+		func(_ any, ss grpc.ServerStream) error {
+			assert.ErrorIs(t, ss.RecvMsg(nil), io.EOF)
+			return nil
+		},
+	)
+	require.NoError(t, err)
+}

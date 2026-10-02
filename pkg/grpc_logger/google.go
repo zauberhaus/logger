@@ -3,6 +3,7 @@ package grpc_logger
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/zauberhaus/logger/pkg/logger"
 	"google.golang.org/grpc/grpclog"
@@ -21,7 +22,7 @@ func (g *GrpcLogger) Info(args ...any) {
 }
 
 func (g *GrpcLogger) Infoln(args ...any) {
-	g.logger.Info(fmt.Sprint(args...))
+	g.logger.Info(sprintln(args...))
 }
 
 func (g *GrpcLogger) Infof(format string, args ...any) {
@@ -33,7 +34,7 @@ func (g *GrpcLogger) Warning(args ...any) {
 }
 
 func (g *GrpcLogger) Warningln(args ...any) {
-	g.logger.Warn(fmt.Sprint(args...))
+	g.logger.Warn(sprintln(args...))
 }
 
 func (g *GrpcLogger) Warningf(format string, args ...any) {
@@ -45,7 +46,7 @@ func (g *GrpcLogger) Error(args ...any) {
 }
 
 func (g *GrpcLogger) Errorln(args ...any) {
-	g.logger.Error(fmt.Sprint(args...))
+	g.logger.Error(sprintln(args...))
 }
 
 func (g *GrpcLogger) Errorf(format string, args ...any) {
@@ -57,7 +58,7 @@ func (g *GrpcLogger) Fatal(args ...any) {
 }
 
 func (g *GrpcLogger) Fatalln(args ...any) {
-	g.logger.Fatal(fmt.Sprint(args...))
+	g.logger.Fatal(sprintln(args...))
 }
 
 func (g *GrpcLogger) Fatalf(format string, args ...any) {
@@ -71,4 +72,10 @@ func (g *GrpcLogger) V(l int) bool {
 		return g.logger.HasLevel(logger.InfoLevel)
 	}
 	return g.logger.IsDebugEnabled()
+}
+
+// sprintln formats args in the manner of fmt.Println, as grpclog.LoggerV2
+// requires for its *ln methods, without the trailing newline.
+func sprintln(args ...any) string {
+	return strings.TrimSuffix(fmt.Sprintln(args...), "\n")
 }

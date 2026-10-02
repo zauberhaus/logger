@@ -31,6 +31,7 @@ func WithRegion(region string) Option {
 }
 
 // WithURL overrides the full Log API URL. Useful for testing or proxies.
+// Plain http URLs additionally require WithAllowHTTP.
 func WithURL(url string) Option {
 	return optionFunc(func(w *Sink) { w.url = url })
 }
@@ -68,6 +69,12 @@ func WithFlushInterval(d time.Duration) Option {
 // WithHTTPClient sets the HTTP client used for log ingestion requests.
 func WithHTTPClient(client *http.Client) Option {
 	return optionFunc(func(w *Sink) { w.client = client })
+}
+
+// WithAllowHTTP permits a plain http Log API URL, e.g. for local tests. By
+// default only https URLs are accepted.
+func WithAllowHTTP() Option {
+	return optionFunc(func(w *Sink) { w.allowHTTP = true })
 }
 
 // WithErrorHandler registers a callback invoked on delivery errors.

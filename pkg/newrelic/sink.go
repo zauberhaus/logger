@@ -30,6 +30,7 @@ type Sink struct {
 	flushInterval time.Duration
 	attrs         map[string]string
 	onError       func(error)
+	allowHTTP     bool
 
 	mu    sync.Mutex
 	lines [][]byte
@@ -56,6 +57,11 @@ func NewSink(licenseKey string, opts ...Option) (logger.Sink, error) {
 	for _, opt := range opts {
 		opt.apply(w)
 	}
+
+	if err := logger.CheckEndpoint(w.url, w.allowHTTP); err != nil {
+		return nil, fmt.Errorf("newrelic: %w", err)
+	}
+	w.client = logger.SecureClient(w.client, w.allowHTTP)
 
 	if err := w.healthCheck(); err != nil {
 		return nil, err
@@ -171,7 +177,7 @@ func (w *Sink) flush() error {
 
 // buildPayload constructs the New Relic Log API batch payload.
 // Common attributes (service, hostname, extras) are hoisted into the "common"
-// block so they are not repeated per entry. Each zap JSON log object is placed
+// block so they are not repeated per entry. Each valid JSON log object is placed
 // in the "logs" array; plain-text lines are wrapped with a "message" key.
 func (w *Sink) buildPayload(lines [][]byte) []byte {
 	var logsBuf bytes.Buffer
@@ -181,7 +187,7 @@ func (w *Sink) buildPayload(lines [][]byte) []byte {
 			logsBuf.WriteByte(',')
 		}
 		trimmed := bytes.TrimSpace(line)
-		if len(trimmed) > 1 && trimmed[0] == '{' && trimmed[len(trimmed)-1] == '}' {
+		if len(trimmed) > 1 && trimmed[0] == '{' && trimmed[len(trimmed)-1] == '}' && json.Valid(trimmed) {
 			logsBuf.Write(trimmed)
 		} else {
 			logsBuf.WriteString(`{"message":`)

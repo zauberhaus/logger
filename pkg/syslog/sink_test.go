@@ -8,8 +8,12 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"io"
 	"math/big"
 	"net"
+	"regexp"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -42,8 +46,8 @@ func readPacket(t *testing.T, conn *net.UDPConn) string {
 	return string(buf[:n])
 }
 
-// acceptLines accepts connections on l and sends every received line to the
-// returned channel. The returned function closes all accepted connections.
+// acceptLines accepts connections on l and sends every received octet-counted
+// frame to the returned channel. The returned function closes all accepted connections.
 func acceptLines(l net.Listener) (<-chan string, func()) {
 	var (
 		mu    sync.Mutex
@@ -64,11 +68,14 @@ func acceptLines(l net.Listener) (<-chan string, func()) {
 
 			go func() {
 				defer c.Close()
-				sc := bufio.NewScanner(c)
-				for sc.Scan() {
-					lines <- sc.Text()
+				r := bufio.NewReader(c)
+				for {
+					msg, err := readFrame(r)
+					if err != nil {
+						return
+					}
+					lines <- msg
 				}
-				_ = sc.Err()
 			}()
 		}
 	}()
@@ -80,6 +87,23 @@ func acceptLines(l net.Listener) (<-chan string, func()) {
 			c.Close()
 		}
 	}
+}
+
+// readFrame reads one RFC 6587 octet-counted frame: "<len> <msg>".
+func readFrame(r *bufio.Reader) (string, error) {
+	prefix, err := r.ReadString(' ')
+	if err != nil {
+		return "", err
+	}
+	n, err := strconv.Atoi(strings.TrimSuffix(prefix, " "))
+	if err != nil {
+		return "", err
+	}
+	buf := make([]byte, n)
+	if _, err := io.ReadFull(r, buf); err != nil {
+		return "", err
+	}
+	return string(buf), nil
 }
 
 func nextLine(t *testing.T, lines <-chan string) string {
@@ -214,6 +238,29 @@ func TestSink_TCP(t *testing.T) {
 
 	assert.Regexp(t, `^<11>1 \S+ myhost myapp \d+ - - \{"level":"error","msg":"one"\}$`, nextLine(t, lines))
 	assert.Regexp(t, `^<14>1 .* \{"level":"info","msg":"two"\}$`, nextLine(t, lines))
+}
+
+func TestSink_TCPEmbeddedNewlineStaysInOneMessage(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer l.Close()
+	lines, _ := acceptLines(l)
+
+	s, err := syslog.NewSink(l.Addr().String(),
+		syslog.WithNetwork(syslog.NetworkTCP),
+		syslog.WithHostname("myhost"),
+	)
+	require.NoError(t, err)
+	defer s.Close()
+
+	forged := "<10>1 2026-01-01T00:00:00Z fakehost sshd - - - forged"
+	_, err = s.Write([]byte("first\n" + forged + "\n"))
+	require.NoError(t, err)
+	_, err = s.Write([]byte("second\n"))
+	require.NoError(t, err)
+
+	assert.Regexp(t, `^<14>1 \S+ myhost \S+ \d+ - - first\n`+regexp.QuoteMeta(forged)+`$`, nextLine(t, lines))
+	assert.Regexp(t, ` - - second$`, nextLine(t, lines))
 }
 
 func TestSink_TCPReconnects(t *testing.T) {
@@ -381,4 +428,66 @@ func selfSignedCert(t *testing.T) (tls.Certificate, *x509.CertPool) {
 	pool.AddCert(parsed)
 
 	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}, pool
+}
+
+func TestSink_TCPServerGone(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	_, drop := acceptLines(l)
+
+	s, err := syslog.NewSink(l.Addr().String(),
+		syslog.WithNetwork(syslog.NetworkTCP),
+		syslog.WithDialTimeout(time.Second),
+	)
+	require.NoError(t, err)
+	defer s.Close()
+
+	require.NoError(t, l.Close())
+	drop()
+
+	// Writes may still land in the dead connection's buffer; once the loss is
+	// detected, reconnecting fails and the error is returned.
+	require.Eventually(t, func() bool {
+		_, err := s.Write([]byte("lost"))
+		return err != nil
+	}, 3*time.Second, 10*time.Millisecond)
+
+	_, err = s.Write([]byte("still down"))
+	assert.ErrorContains(t, err, "syslog: send log:")
+}
+
+func TestSink_EmptyHeaderFieldsBecomeNil(t *testing.T) {
+	srv, addr := listenUDP(t)
+
+	s, err := syslog.NewSink(addr,
+		syslog.WithAppName("   "),
+		syslog.WithHostname("ééé"),
+	)
+	require.NoError(t, err)
+	defer s.Close()
+
+	_, err = s.Write([]byte("x"))
+	require.NoError(t, err)
+
+	// RFC 5424 NILVALUE "-" for fields with no printable characters.
+	assert.Regexp(t, `^<14>1 \S+ - - \d+ - - x$`, readPacket(t, srv))
+}
+
+func TestSink_UnterminatedLevelUsesDefaultSeverity(t *testing.T) {
+	srv, addr := listenUDP(t)
+
+	s, err := syslog.NewSink(addr, syslog.WithDefaultSeverity(syslog.SeverityNotice))
+	require.NoError(t, err)
+	defer s.Close()
+
+	_, err = s.Write([]byte(`{"level":"err`))
+	require.NoError(t, err)
+
+	// user (1) * 8 + notice (5) = 13
+	assert.Contains(t, readPacket(t, srv), "<13>1 ")
+}
+
+func TestWithSyslog_Error(t *testing.T) {
+	_, err := syslog.WithSyslog("127.0.0.1:514", syslog.WithNetwork("sctp"))
+	assert.ErrorContains(t, err, `syslog: unsupported network "sctp"`)
 }

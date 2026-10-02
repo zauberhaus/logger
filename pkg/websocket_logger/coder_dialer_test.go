@@ -241,3 +241,42 @@ func TestCoder_DialerWithHeader(t *testing.T) {
 	txt := string(l.Bytes())
 	assert.Contains(t, txt, "[WS HANDSHAKE SUCCESS]")
 }
+
+func TestCoder_DialerHeadersArePerCall(t *testing.T) {
+	for _, level := range []logger.Level{logger.DebugLevel, logger.InfoLevel} {
+		t.Run(level.String(), func(t *testing.T) {
+			got := make(chan http.Header, 2)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				got <- r.Header.Clone()
+				conn, err := ws.Accept(w, r, nil)
+				if err != nil {
+					return
+				}
+				conn.CloseNow()
+			}))
+			defer server.Close()
+
+			l := memory.NewLogger(zap.WithLevel(level))
+			ctx := context.Background()
+
+			opts := &ws.DialOptions{HTTPHeader: http.Header{"X-Base": {"base"}}}
+			dialer := websocket_logger.NewCoderLoggingDialer(wsURL(server), opts, l)
+
+			conn, _, err := dialer.Dial(ctx, wsURL(server), http.Header{"Authorization": {"Bearer first"}})
+			require.NoError(t, err)
+			conn.CloseNow()
+			h := <-got
+			assert.Equal(t, "base", h.Get("X-Base"))
+			assert.Equal(t, []string{"Bearer first"}, h.Values("Authorization"))
+
+			conn, _, err = dialer.Dial(ctx, wsURL(server), nil)
+			require.NoError(t, err)
+			conn.CloseNow()
+			h = <-got
+			assert.Equal(t, "base", h.Get("X-Base"))
+			assert.Empty(t, h.Values("Authorization"))
+
+			assert.Equal(t, http.Header{"X-Base": {"base"}}, opts.HTTPHeader)
+		})
+	}
+}

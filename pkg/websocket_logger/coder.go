@@ -94,20 +94,16 @@ func (c *coderLoggingConn) Ping(ctx context.Context) error {
 }
 
 func (c *coderLoggingDialer) Dial(ctx context.Context, url string, header http.Header) (CoderConnection, *http.Response, error) {
+	opts := c.dialOptions(header)
+
 	if !c.logger.IsDebugEnabled() {
-		return ws.Dial(ctx, url, c.opts)
+		return ws.Dial(ctx, url, opts)
 	}
 
 	c.logger.Debugf("[WS HANDSHAKE] Requesting: %s", url)
 	start := time.Now()
 
-	for k, items := range header {
-		for _, v := range items {
-			c.opts.HTTPHeader.Add(k, v)
-		}
-	}
-
-	conn, resp, err := ws.Dial(ctx, url, c.opts)
+	conn, resp, err := ws.Dial(ctx, url, opts)
 
 	duration := time.Since(start)
 
@@ -126,6 +122,28 @@ func (c *coderLoggingDialer) Dial(ctx context.Context, url string, header http.H
 		conn:   conn,
 		logger: c.logger,
 	}, resp, nil
+}
+
+// dialOptions returns a per-call copy of the dialer options with header merged
+// in, so headers never leak between dials and the shared options stay unchanged.
+func (c *coderLoggingDialer) dialOptions(header http.Header) *ws.DialOptions {
+	var opts ws.DialOptions
+	if c.opts != nil {
+		opts = *c.opts
+	}
+
+	h := opts.HTTPHeader.Clone()
+	if h == nil {
+		h = http.Header{}
+	}
+	for k, items := range header {
+		for _, v := range items {
+			h.Add(k, v)
+		}
+	}
+	opts.HTTPHeader = h
+
+	return &opts
 }
 
 func DialCoder(ctx context.Context, urlStr string, opts *ws.DialOptions, logger logger.Logger) (CoderConnection, *http.Response, error) {

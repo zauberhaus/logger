@@ -337,3 +337,8 @@ func TestLevel_WithSeparation(t *testing.T) {
 	assert.Equal(t, core.DebugLevel, l1.Level())
 	assert.Equal(t, core.InfoLevel, l2.Level())
 }
+
+func TestLevel_UnmarshalTextNilReceiver(t *testing.T) {
+	var l *logger.Level
+	assert.Error(t, l.UnmarshalText([]byte("info")))
+}

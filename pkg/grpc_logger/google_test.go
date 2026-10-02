@@ -160,3 +160,39 @@ func TestGrpcLogger_Memory(t *testing.T) {
 
 	assert.Equal(t, 0, m.Len())
 }
+
+func TestGrpcLogger_Fatal(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	m := mock.NewMockLogger(ctrl)
+	m.EXPECT().Fatal("a", 1)
+	m.EXPECT().Fatal("a 1")
+	m.EXPECT().Fatalf("%s=%d", "a", 1)
+
+	l := grpc_logger.NewLogger(m)
+	l.Fatal("a", 1)
+	l.Fatalln("a", 1)
+	l.Fatalf("%s=%d", "a", 1)
+}
+
+// gRPC component loggers call the *ln methods with the component name as a
+// separate first argument; arguments must be space-separated like fmt.Println.
+func TestGrpcLogger_LnSeparatesArgs(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	const want = "[core] [Channel #1] Channel created"
+
+	m := mock.NewMockLogger(ctrl)
+	m.EXPECT().Info(want)
+	m.EXPECT().Warn(want)
+	m.EXPECT().Error(want)
+	m.EXPECT().Fatal(want)
+
+	l := grpc_logger.NewLogger(m)
+	l.Infoln("[core]", "[Channel #1]", "Channel created")
+	l.Warningln("[core]", "[Channel #1]", "Channel created")
+	l.Errorln("[core]", "[Channel #1]", "Channel created")
+	l.Fatalln("[core]", "[Channel #1]", "Channel created")
+}

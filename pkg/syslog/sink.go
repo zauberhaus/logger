@@ -69,8 +69,9 @@ const (
 const defaultTimeout = 5 * time.Second
 
 // Sink ships log lines to a remote syslog server as RFC 5424 messages.
-// Over TCP and TLS, messages are newline-delimited (RFC 6587 non-transparent
-// framing) and the connection is re-established after a failed write.
+// Over TCP and TLS, messages use octet-counting framing (RFC 6587 section
+// 3.4.1, RFC 5425 section 4.3), so embedded newlines cannot split a message,
+// and the connection is re-established after a failed write.
 type Sink struct {
 	address   string
 	network   string
@@ -226,7 +227,7 @@ func (s *Sink) write(msg []byte) error {
 //
 //	<PRI>1 TIMESTAMP HOSTNAME APP-NAME PROCID MSGID STRUCTURED-DATA MSG
 //
-// Over TCP the message is terminated by a newline.
+// Over TCP and TLS the message is prefixed with its length in octets.
 func (s *Sink) format(line []byte, ts time.Time) []byte {
 	pri := int(s.facility)*8 + int(s.severity(line))
 
@@ -240,10 +241,16 @@ func (s *Sink) format(line []byte, ts time.Time) []byte {
 		field(s.procID, 128),
 	)
 	b.Write(line)
-	if s.network != NetworkUDP {
-		b.WriteByte('\n')
+
+	if s.network == NetworkUDP {
+		return b.Bytes()
 	}
-	return b.Bytes()
+
+	msg := b.Bytes()
+	framed := make([]byte, 0, len(msg)+12)
+	framed = strconv.AppendInt(framed, int64(len(msg)), 10)
+	framed = append(framed, ' ')
+	return append(framed, msg...)
 }
 
 // severity derives the severity from the level of a zap JSON line. Lines
