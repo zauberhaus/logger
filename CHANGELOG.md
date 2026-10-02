@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.7.0](https://github.com/zauberhaus/logger/compare/v1.6.0...v1.7.0) (2026-10-02)
+
+
+### Features
+
+* add cloudwatch sink ([04d1482](https://github.com/zauberhaus/logger/commit/04d1482235540d23bd52c5047f7170560a5cc60b))
+* add syslog message formats ([dbac6b5](https://github.com/zauberhaus/logger/commit/dbac6b5710c904be60a38090b502185ac0d42f75))
+
+
+### Bug Fixes
+
+* issues with existing sinks ([f41095b](https://github.com/zauberhaus/logger/commit/f41095b4f3eb15fea0e72e5a4a224f6871a807ad))
+* timing problem in test ([0b00c5a](https://github.com/zauberhaus/logger/commit/0b00c5ac322112da12f65ee21921bb53e5a312b7))
+
 ## [1.6.0](https://github.com/zauberhaus/logger/compare/v1.5.0...v1.6.0) (2026-10-01)
 
 
