@@ -1,0 +1,12 @@
+# Loaded automatically by gitleaks from the repository root.
+title = "logger"
+
+[extend]
+useDefault = true
+
+# .vscode is git-ignored and holds local integration-test credentials. It never
+# reaches the repository, but the working-tree scan (gitleaks dir) reads every
+# file on disk, ignored or not.
+[[allowlists]]
+description = "git-ignored local editor settings"
+paths = ['''^\.vscode/''']
