@@ -1,3 +1,8 @@
+// Copyright 2026 Zauberhaus
+// Licensed to Zauberhaus under one or more agreements.
+// Zauberhaus licenses this file to you under the Apache 2.0 License.
+// See the LICENSE file in the project root for more information.
+
 //go:generate go run go.uber.org/mock/mockgen@latest -package mock --typed --write_package_comment=false -destination=../mock/sentry_transport_mock.go -mock_names=Transport=MockSentryTransport github.com/getsentry/sentry-go Transport
 
 // github.com/getsentry/sentry-go
