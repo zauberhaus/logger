@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.7.3](https://github.com/zauberhaus/logger/compare/v1.7.2...v1.7.3) (2026-11-12)
+
+
+### Bug Fixes
+
+* add missing docker file ([3a4c18c](https://github.com/zauberhaus/logger/commit/3a4c18c9f1f78d3e7962f96c9c74074bed2973b3))
+* add security check ([f4389ad](https://github.com/zauberhaus/logger/commit/f4389ad2bf14d1e485088429b9d5495cef84bd14))
+* exclude local files from gitleaks check ([adb09f4](https://github.com/zauberhaus/logger/commit/adb09f4c6a5bef1900a135c8245acc99340d96f4))
+* security findings ([b2d2ef8](https://github.com/zauberhaus/logger/commit/b2d2ef853de59546b6b3efa04b2c52b40e684ee1))
+
 ## [1.7.2](https://github.com/zauberhaus/logger/compare/v1.7.1...v1.7.2) (2026-11-12)
 
 
