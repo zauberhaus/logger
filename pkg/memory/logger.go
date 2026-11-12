@@ -54,7 +54,7 @@ func (m *MemoryLogger) Close() {
 	m.stop()
 
 	m.buffer.CloseWriter()
-	m.buffer.Flush()
+	_ = m.buffer.Flush()
 }
 
 func (m *MemoryLogger) Bytes() []byte {

@@ -126,7 +126,7 @@ func (w *Sink) run() {
 	for {
 		select {
 		case <-t.C:
-			w.flush()
+			_ = w.flush()
 		case <-w.ctx.Done():
 			return
 		}

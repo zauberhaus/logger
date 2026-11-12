@@ -176,7 +176,7 @@ func (s *Sink) send(msg []byte) error {
 		if err := s.write(msg); err == nil {
 			return nil
 		}
-		s.conn.Close()
+		_ = s.conn.Close()
 		s.conn = nil
 	}
 
@@ -184,7 +184,7 @@ func (s *Sink) send(msg []byte) error {
 		return err
 	}
 	if err := s.write(msg); err != nil {
-		s.conn.Close()
+		_ = s.conn.Close()
 		s.conn = nil
 		return err
 	}

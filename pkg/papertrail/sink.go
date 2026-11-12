@@ -155,7 +155,7 @@ func (w *Sink) run() {
 		case line := <-w.queue:
 			w.add(line)
 		case <-t.C:
-			w.flush()
+			_ = w.flush()
 		case reply := <-w.syncReq:
 			w.drain()
 			reply <- w.flush()
@@ -173,7 +173,7 @@ func (w *Sink) add(line []byte) {
 	w.lines = append(w.lines, line)
 	w.size += len(line)
 	if len(w.lines) >= w.batchSize || w.size >= maxPayloadBytes {
-		w.flush()
+		_ = w.flush()
 	}
 }
 

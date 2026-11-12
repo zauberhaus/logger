@@ -237,7 +237,7 @@ func (w *Sink) run() {
 		case ev := <-w.queue:
 			w.add(ev)
 		case <-t.C:
-			w.flush()
+			_ = w.flush()
 		case reply := <-w.syncReq:
 			w.drain()
 			reply <- w.flush()
@@ -257,7 +257,7 @@ func (w *Sink) add(ev event) {
 	if len(w.events) > 0 {
 		span := time.Duration(ev.timestamp-w.events[0].timestamp) * time.Millisecond
 		if len(w.events) >= w.batchSize || w.size+size > maxBatchBytes || span > maxBatchSpan {
-			w.flush()
+			_ = w.flush()
 		}
 	}
 
@@ -265,7 +265,7 @@ func (w *Sink) add(ev event) {
 	w.size += size
 
 	if len(w.events) >= w.batchSize {
-		w.flush()
+		_ = w.flush()
 	}
 }
 
