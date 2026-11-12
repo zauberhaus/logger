@@ -13,9 +13,11 @@
 #      request. An app, not a personal access token: commits an app makes
 #      through the API are signed, which the main ruleset requires.
 #   6. The "main" ruleset on the default branch: no deletion or force
-#      pushes, signed commits, the "test" check from tests.yml, the
+#      pushes, the "test" check from tests.yml, the
 #      "security" check from security.yml, changes only through pull requests,
-#      CodeQL, code quality and Copilot review.
+#      CodeQL, code quality and Copilot review. Repository admins may bypass it.
+#   7. The "signed-commits" ruleset: signed commits on every branch, with no
+#      bypass, not even for admins.
 #
 # The dev branch is deliberately not created: GitHub deletes it when its pull
 # request is merged, and release.sh pushes it again when it is needed.
@@ -199,8 +201,22 @@ configure_secret() {
   printf '%s' "$token" | gh secret set "$name" -R "$REPO"
 }
 
+# upsert_ruleset NAME JSON: create the ruleset, or update the one with that name.
+upsert_ruleset() {
+  local name=$1 body=$2 id
+
+  id=$(gh api "repos/$REPO/rulesets" --jq ".[] | select(.name == \"$name\") | .id" | head -n 1) || return 1
+  if [ -n "$id" ]; then
+    echo "    updating existing ruleset $name ($id)"
+    api_write PUT "repos/$REPO/rulesets/$id" "$body"
+  else
+    api_write POST "repos/$REPO/rulesets" "$body"
+  fi
+}
+
+
 configure_ruleset() {
-  local body id
+  local body
 
   body=$(cat <<'JSON'
 {
@@ -216,7 +232,6 @@ configure_ruleset() {
   "rules": [
     {"type": "deletion"},
     {"type": "non_fast_forward"},
-    {"type": "required_signatures"},
     {
       "type": "required_status_checks",
       "parameters": {
@@ -258,13 +273,25 @@ configure_ruleset() {
 JSON
   )
 
-  id=$(gh api "repos/$REPO/rulesets" --jq '.[] | select(.name == "main") | .id' | head -n 1) || return 1
-  if [ -n "$id" ]; then
-    echo "    updating existing ruleset $id"
-    api_write PUT "repos/$REPO/rulesets/$id" "$body"
-  else
-    api_write POST "repos/$REPO/rulesets" "$body"
-  fi
+  upsert_ruleset main "$body"
+}
+
+# Signed commits on every branch, for everyone: no bypass actors, so admins
+# cannot push unsigned commits either. Separate from the main ruleset, whose
+# admin bypass would otherwise lift this rule on main.
+configure_signed_commits() {
+  upsert_ruleset signed-commits '{
+  "name": "signed-commits",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {"include": ["~ALL"], "exclude": []}
+  },
+  "bypass_actors": [],
+  "rules": [
+    {"type": "required_signatures"}
+  ]
+}'
 }
 
 command -v gh >/dev/null || die "gh (GitHub CLI) is required"
@@ -294,6 +321,7 @@ if $DO_SECRET; then
 fi
 if $DO_RULESET; then
   step "main ruleset" configure_ruleset
+  step "signed-commits ruleset" configure_signed_commits
 fi
 
 echo
