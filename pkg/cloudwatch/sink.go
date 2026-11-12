@@ -1,3 +1,8 @@
+// Copyright 2026 Zauberhaus
+// Licensed to Zauberhaus under one or more agreements.
+// Zauberhaus licenses this file to you under the Apache 2.0 License.
+// See the LICENSE file in the project root for more information.
+
 package cloudwatch
 
 import (
@@ -232,7 +237,7 @@ func (w *Sink) run() {
 		case ev := <-w.queue:
 			w.add(ev)
 		case <-t.C:
-			w.flush()
+			_ = w.flush()
 		case reply := <-w.syncReq:
 			w.drain()
 			reply <- w.flush()
@@ -252,7 +257,7 @@ func (w *Sink) add(ev event) {
 	if len(w.events) > 0 {
 		span := time.Duration(ev.timestamp-w.events[0].timestamp) * time.Millisecond
 		if len(w.events) >= w.batchSize || w.size+size > maxBatchBytes || span > maxBatchSpan {
-			w.flush()
+			_ = w.flush()
 		}
 	}
 
@@ -260,7 +265,7 @@ func (w *Sink) add(ev event) {
 	w.size += size
 
 	if len(w.events) >= w.batchSize {
-		w.flush()
+		_ = w.flush()
 	}
 }
 

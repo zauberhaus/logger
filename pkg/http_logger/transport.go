@@ -1,3 +1,8 @@
+// Copyright 2026 Zauberhaus
+// Licensed to Zauberhaus under one or more agreements.
+// Zauberhaus licenses this file to you under the Apache 2.0 License.
+// See the LICENSE file in the project root for more information.
+
 // cspell:ignore andybalholm
 package http_logger
 
@@ -50,12 +55,12 @@ func (l *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	if req.Body != nil {
 		body, complete, err := peekBody(req.Body)
 		if err != nil {
-			req.Body.Close()
+			_ = req.Body.Close()
 			return nil, err
 		}
 
 		if complete {
-			req.Body.Close()
+			_ = req.Body.Close()
 			req.Body = io.NopCloser(bytes.NewReader(body))
 		} else {
 			req.Body = &multiReadCloser{
@@ -82,7 +87,7 @@ func (l *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	if resp.Body != nil {
 		reader, decoded, err := ProcessEncoding(resp)
 		if err != nil && err != ErrUnknownContentEncoding {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			return nil, err
 		}
 
@@ -93,12 +98,12 @@ func (l *LoggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 		}
 		body, complete, err := peekBody(reader)
 		if err != nil {
-			closeAll(closers)
+			_ = closeAll(closers)
 			return nil, err
 		}
 
 		if complete {
-			closeAll(closers)
+			_ = closeAll(closers)
 			resp.Body = io.NopCloser(bytes.NewReader(body))
 		} else {
 			resp.Body = &multiReadCloser{

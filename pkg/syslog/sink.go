@@ -1,3 +1,8 @@
+// Copyright 2026 Zauberhaus
+// Licensed to Zauberhaus under one or more agreements.
+// Zauberhaus licenses this file to you under the Apache 2.0 License.
+// See the LICENSE file in the project root for more information.
+
 package syslog
 
 import (
@@ -171,7 +176,7 @@ func (s *Sink) send(msg []byte) error {
 		if err := s.write(msg); err == nil {
 			return nil
 		}
-		s.conn.Close()
+		_ = s.conn.Close()
 		s.conn = nil
 	}
 
@@ -179,7 +184,7 @@ func (s *Sink) send(msg []byte) error {
 		return err
 	}
 	if err := s.write(msg); err != nil {
-		s.conn.Close()
+		_ = s.conn.Close()
 		s.conn = nil
 		return err
 	}

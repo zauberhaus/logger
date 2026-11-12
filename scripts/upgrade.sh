@@ -27,7 +27,7 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 # modules lists every module that provides a package this project builds or
 # tests. The full module graph ('go list -m all') also contains modules that

@@ -1,3 +1,8 @@
+// Copyright 2026 Zauberhaus
+// Licensed to Zauberhaus under one or more agreements.
+// Zauberhaus licenses this file to you under the Apache 2.0 License.
+// See the LICENSE file in the project root for more information.
+
 package memory
 
 import (
@@ -49,7 +54,7 @@ func (m *MemoryLogger) Close() {
 	m.stop()
 
 	m.buffer.CloseWriter()
-	m.buffer.Flush()
+	_ = m.buffer.Flush()
 }
 
 func (m *MemoryLogger) Bytes() []byte {

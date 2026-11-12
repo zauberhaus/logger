@@ -1,3 +1,8 @@
+// Copyright 2026 Zauberhaus
+// Licensed to Zauberhaus under one or more agreements.
+// Zauberhaus licenses this file to you under the Apache 2.0 License.
+// See the LICENSE file in the project root for more information.
+
 package papertrail
 
 import (
@@ -150,7 +155,7 @@ func (w *Sink) run() {
 		case line := <-w.queue:
 			w.add(line)
 		case <-t.C:
-			w.flush()
+			_ = w.flush()
 		case reply := <-w.syncReq:
 			w.drain()
 			reply <- w.flush()
@@ -168,7 +173,7 @@ func (w *Sink) add(line []byte) {
 	w.lines = append(w.lines, line)
 	w.size += len(line)
 	if len(w.lines) >= w.batchSize || w.size >= maxPayloadBytes {
-		w.flush()
+		_ = w.flush()
 	}
 }
 
