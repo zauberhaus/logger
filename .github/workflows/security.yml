@@ -11,7 +11,7 @@ permissions:
   packages: write # push the image when it does not exist yet
 
 env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/secrets-security
+  IMAGE: ghcr.io/${{ github.repository_owner }}/logger-security
 
 jobs:
   # The tools run in an image (Go, govulncheck, gosec, gitleaks) so they are not
