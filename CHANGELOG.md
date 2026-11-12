@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.2](https://github.com/zauberhaus/logger/compare/v1.7.1...v1.7.2) (2026-11-12)
+
+
+### Bug Fixes
+
+* upgrade dependencies ([55d688b](https://github.com/zauberhaus/logger/commit/55d688b089a89b3b01ad43744c2bc1a36b434f20))
+
 ## [1.7.0](https://github.com/zauberhaus/logger/compare/v1.6.0...v1.7.0) (2026-10-02)
 
 
