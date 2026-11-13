@@ -19,7 +19,7 @@ jobs:
 
     steps:
     - name: Checkout Code
-      uses: actions/checkout@v7
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         fetch-depth: 0
 
@@ -37,7 +37,7 @@ jobs:
 
     - name: Setup go
       if: steps.changes.outputs.go == 'true'
-      uses: actions/setup-go@v7
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
         go-version-file: "go.mod"
         check-latest: true
@@ -66,7 +66,7 @@ jobs:
 
     - name: Generate code coverage report
       if: steps.changes.outputs.go == 'true'
-      uses: irongut/CodeCoverageSummary@v1.3.0
+      uses: irongut/CodeCoverageSummary@51cc3a756ddcd398d447c044c02cb6aa83fdae95 # v1.3.0
       with:
         filename: coverage.xml
         badge: false
@@ -80,7 +80,7 @@ jobs:
 
     - name: Add Coverage PR Comment
       if: steps.changes.outputs.go == 'true'
-      uses: marocchino/sticky-pull-request-comment@v3
+      uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
       with:
         header: test
         recreate: true
