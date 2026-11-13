@@ -25,11 +25,21 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
+      # A GitHub App token, not GITHUB_TOKEN: pull requests created with it
+      # start the required checks without a manual approval, and commits made
+      # through the API are signed, which the rulesets require.
+      - name: Create App Token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
       - name: Check Commits
         id: release
         uses: googleapis/release-please-action@v5
         with:
-          # token: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           release-type: go
           release-as: ${{ github.event_name == 'workflow_dispatch' && inputs.version || '' }}
 
@@ -42,4 +52,4 @@ jobs:
         id: merge
         run: gh pr merge --merge --auto "${{ fromJSON(steps.release.outputs.pr || '{}').number }}" 
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
