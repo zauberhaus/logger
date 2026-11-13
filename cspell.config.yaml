@@ -6,6 +6,7 @@ ignorePaths:
   - .gitignore
   - cspell.config.yaml
 words:
+  - genproto
   - agiledragon
   - AKID
   - ALLCAPS
@@ -16,20 +17,30 @@ words:
   - bufconn
   - cloudwatchlogs
   - CLUSTERDOWN
+  - covermode
   - coverprofile
   - creasty
   - ddsource
   - Ddtags
   - Debugf
   - dpanic
+  - Errorf
+  - Fatalf
   - getsentry
   - gobeam
+  - GOBIN
   - gocover
   - gomock
   - gomonkey
+  - GOPATH
+  - gosec
+  - GOSEC
   - gotest
   - gotestfmt
   - gotesttools
+  - GOTOOLCHAIN
+  - govulncheck
+  - GOVULNCHECK
   - grpclog
   - Infof
   - irongut
@@ -38,30 +49,38 @@ words:
   - marocchino
   - mitchellh
   - mockgen
+  - modcache
+  - myapp
   - myhost
   - mysvc
   - mytarget
   - newhost
   - newrelic
   - nolint
+  - Panicf
   - papertrail
   - papertrailapp
   - pflag
   - pflags
   - ringbuffer
+  - securego
   - serialises
   - smallnest
   - sourcetype
   - stretchr
   - Syncer
-  - syslog
   - synker
+  - syslog
   - testapp
   - testhost
+  - tfvars
   - TRYAGAIN
+  - Unmarshal
   - upgrader
   - varargs
   - verylongname
   - Warnf
   - zaplogger
+  - zaptest
   - Zauberhaus
+  - zricethezav

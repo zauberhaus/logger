@@ -106,7 +106,7 @@ if [[ $PATCH -eq 1 ]]; then
     fi
 else
     echo "==> upgrading dependencies"
-    go get -u ./...
+    go get -u -t ./...
 fi
 
 echo "==> tidying go.mod"

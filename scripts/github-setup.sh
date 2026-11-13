@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 #
 # Configure the GitHub side of this repository the same way as
-# zauberhaus/reflect_utils, so the workflows in .github/workflows work:
+# the sibling zauberhaus projects, so the workflows in .github/workflows work:
 #
 #   1. Repository settings: auto-merge, delete branches on merge, merge
 #      commit message format, no wiki or projects.
-#   2. Secret scanning with push protection.
+#   2. Secret scanning with push protection, Dependabot alerts and Dependabot
+#      security updates. Version updates are configured in
+#      .github/dependabot.yml.
 #   3. Actions: read-only default token, workflows may approve pull requests.
 #   4. CodeQL default setup (the main ruleset requires its results).
 #   5. The RELEASE_APP_ID and RELEASE_APP_PRIVATE_KEY secrets of the GitHub App
@@ -146,6 +148,13 @@ configure_security() {
 }'
 }
 
+# Dependabot alerts (vulnerable dependencies) and security updates (pull
+# requests that fix them). These endpoints answer 204 and are idempotent.
+configure_dependabot() {
+  api_write PUT "repos/$REPO/vulnerability-alerts" || return 1
+  api_write PUT "repos/$REPO/automated-security-fixes"
+}
+
 configure_actions() {
   api_write PUT "repos/$REPO/actions/permissions/workflow" '{
   "default_workflow_permissions": "read",
@@ -187,6 +196,17 @@ configure_secret() {
     [ -r "$file" ] || { warn "cannot read $file"; return 1; }
     token=$(cat "$file")
   fi
+
+  # read takes one line, which truncates a multi-line value such as a PEM key
+  # to its "-----BEGIN ..." header and produces a secret that cannot be used.
+  case $name in
+    *PRIVATE_KEY)
+      if [ -z "$token" ]; then
+        warn "$name is multi-line: pass it with ${name}_FILE=path/to/app.pem"
+        return 1
+      fi
+      ;;
+  esac
 
   if [ -z "$token" ] && [ -t 0 ]; then
     read -r -s -p "    $name value (input hidden): " token
@@ -313,6 +333,7 @@ fi
 
 step "Repository settings" configure_repo
 step "Secret scanning" configure_security
+step "Dependabot alerts and security updates" configure_dependabot
 step "Actions permissions" configure_actions
 step "CodeQL default setup" configure_codeql
 if $DO_SECRET; then

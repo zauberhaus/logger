@@ -13,3 +13,7 @@ coverage.xml
 terraform.tfvars
 *.pem
 crash.log
+
+package.json
+package-lock.json
+node_modules/
