@@ -57,8 +57,6 @@ jobs:
       if: steps.changes.outputs.go == 'true'
       shell: bash
       run: |
-        go run github.com/boumenot/gocover-cobertura@latest \
-          -ignore-files '_mock\.go$' < coverage.txt > coverage.xml
         gocover-cobertura \
           -ignore-dirs '^/tools' \
           -ignore-files '_mock\.go$' \
